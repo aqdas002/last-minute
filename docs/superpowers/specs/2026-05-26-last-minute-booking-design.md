@@ -3,6 +3,77 @@
 **Status:** Draft for implementation
 **Date:** 2026-05-26
 **Scope:** v1 (MVP for paying users), single-city pilot
+**Stack pivot:** 2026-05-27 — see §0 below
+
+---
+
+## 0. Stack pivot (2026-05-27)
+
+The project pivoted from Next.js to **Spring Boot 3 (Java 21) + React (Vite) SPA + Postgres** after M1 execution began. Reason: user works in Java daily; long-term productivity in the native stack outweighs the solo-MVP velocity of Next.js. The earlier Next.js M1 work is archived in git history; `main` resets to a Spring Boot scaffold.
+
+### What survives the pivot
+
+- **§1 Product** — identical (same 15% commission, same non-refundable + provider-no-show auto-refund, same single-city pilot, same generic-marketplace positioning).
+- **§3 Cross-cutting concepts** — timezone discipline, money rounding, state machine, authorization model. Code snippets are now Java/Spring; semantics are unchanged.
+- **§4 Data model** — all 8 tables, columns, indices, constraints. Prisma schema → JPA entities + Flyway migrations.
+- **§6 Error handling** — every scenario applies. Implementation hints update (e.g., "Server Action" → "Spring `@RestController` + `@Service`").
+- **§8 Open risks / deferred work** — identical.
+
+### What changes
+
+- **§2 Architecture** — see updated diagram below.
+- **§5 Flows** — Spring `@RestController` + `@Service` + Spring Data JPA instead of Next.js Server Actions + Prisma; Spring `@Scheduled` + Spring Modulith events instead of Inngest; Spring Security session-cookie auth instead of Auth.js cookies.
+- **§7 Testing** — JUnit 5 + AssertJ + Testcontainers + MockMvc + WireMock instead of Vitest + Testcontainers + Playwright. (Playwright stays for E2E.)
+
+### Updated tech stack
+
+| Concern | Stack |
+|---|---|
+| Backend language / runtime | Java 21 LTS |
+| Backend framework | Spring Boot 3 (latest stable) |
+| Backend build | Maven |
+| Web layer | Spring Web (REST controllers) |
+| Persistence | Spring Data JPA (Hibernate) |
+| DB migrations | Flyway |
+| Auth | Spring Security 6 — Google OAuth2 + custom magic-link flow (using `verification_tokens` table from §4) + Spring Session JDBC (Postgres-backed sessions; no Redis dependency) |
+| Payments | Stripe Java SDK |
+| Email | Resend REST API |
+| Background jobs | Spring `@Scheduled` for cron; Spring application events for in-process; Spring Retry for backoff; a `webhook_dead_letter` Flyway table + a drainer scheduled job for Stripe webhook DLQ |
+| Frontend framework | React 19 + Vite |
+| Frontend routing | React Router 7 |
+| Frontend data | TanStack Query for server state |
+| Frontend styling | Tailwind v4 |
+| Frontend hosting | Vercel (static SPA) |
+| Backend hosting | Fly.io (Docker container, cheap for solo MVP) |
+| DB hosting | Neon (Postgres) |
+| Observability | Sentry (Java SDK + JavaScript SDK on frontend) |
+| Testing — backend | JUnit 5, AssertJ, Testcontainers (Postgres), MockMvc, WireMock (Stripe stubs), Awaitility (timing-sensitive assertions) |
+| Testing — frontend | Vitest + Testing Library |
+| Testing — E2E | Playwright (against backend in test profile + frontend) |
+| CI | GitHub Actions |
+| Repo shape | Monorepo: `backend/` (Maven) + `frontend/` (Vite) + `docs/` (this spec + plans) |
+
+### Cross-reference table — code-shape substitutions
+
+When §3, §5, §6 reference Next.js / Prisma / Inngest / Auth.js / Vitest by name, substitute as follows:
+
+| Old reference | New reference |
+|---|---|
+| Next.js App Router page / Server Component | Spring `@RestController` returning JSON; React route component renders |
+| Next.js Server Action | Spring `@RestController` `@PostMapping` calling an injected `@Service` |
+| Prisma schema / model | JPA `@Entity` + Flyway migration `.sql` |
+| `prisma.user.create(...)` | `userRepository.save(new User(...))` |
+| `unstable_cache(..., { revalidate: 15, tags })` | Spring `@Cacheable` with Caffeine + a `CacheManager` evict on write |
+| `revalidateTag` / `revalidatePath` | `cacheManager.getCache(...).evict(...)` |
+| Auth.js `auth()` / `requireSession()` | Spring Security `SecurityContextHolder.getContext().getAuthentication()` wrapped in a `@RequireAuth` aspect; controllers receive `@AuthenticationPrincipal CurrentUser user` |
+| Auth.js magic link via Resend | Custom `MagicLinkService` — generate token, persist in `verification_tokens`, send via `ResendClient` |
+| `clock.now()` JS service | Java `Clock` (`java.time.Clock`) injected as Spring `@Bean`; default `Clock.systemUTC()`; tests override with `Clock.fixed(...)` |
+| ESLint `no-raw-date` / `no-sql-now` | ArchUnit tests forbidding `Instant.now()` / `LocalDateTime.now()` outside the clock bean, and forbidding `now()` literals in Flyway SQL (regex check in a unit test) |
+| Inngest job / event | Spring `@Scheduled` cron or `@TransactionalEventListener` for in-process; Spring Retry for backoff |
+| Vitest unit test | JUnit 5 + AssertJ |
+| Vitest integration test against Testcontainers | JUnit 5 + Spring Boot `@SpringBootTest` + Testcontainers `@ServiceConnection` |
+
+The state-machine, money math, idempotency, and concurrency invariants in §3, §4, §6 carry over with no semantic change.
 
 ---
 
@@ -34,6 +105,26 @@ A two-sided web marketplace where providers list perishable last-minute inventor
 ---
 
 ## 2. Architecture
+
+> **§0 stack pivot applies.** The Next.js diagram below is historical; the canonical architecture is now Spring Boot + React. Updated diagram first; original kept for diff reference.
+
+```
+[Consumers]    [Providers]    [Admin]
+     \             |             /
+      \            v            /
+       [ React + Vite SPA (Vercel) ]
+                    |  HTTPS / JSON (CORS + session cookies)
+                    v
+       [ Spring Boot 3 monolith (Fly.io, Docker) ]
+       /     |       |        |        |       \
+      v      v       v        v        v        v
+[Postgres  [Stripe [Resend  [Sentry  [Spring   [Spring
+ (Neon)]   Java    REST]    Java]    Security  @Scheduled
+           SDK]                       Session   + events]
+                                      JDBC]
+```
+
+**Original Next.js diagram (pre-pivot, kept for reference):**
 
 ```
 [Consumers]    [Providers]    [Admin]
