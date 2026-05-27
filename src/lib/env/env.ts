@@ -23,7 +23,7 @@ export function loadEnv(): Env {
   if (!result.success) {
     throw new Error(
       'Invalid environment: ' +
-        result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+        result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '),
     )
   }
   cached = result.data
@@ -31,4 +31,6 @@ export function loadEnv(): Env {
 }
 
 // For tests: clear the cache.
-export function resetEnvCacheForTests() { cached = null }
+export function resetEnvCacheForTests() {
+  cached = null
+}

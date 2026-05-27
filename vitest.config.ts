@@ -14,8 +14,8 @@ export default defineConfig({
       include: ['src/lib/**', 'src/app/api/**'],
       exclude: [
         '**/*.test.{ts,tsx}',
-        'src/lib/db/prisma.ts',          // singleton wrapper
-        'src/lib/sentry/**',              // glue to a vendor SDK
+        'src/lib/db/prisma.ts', // singleton wrapper
+        'src/lib/sentry/**', // glue to a vendor SDK
       ],
       reporter: ['text', 'lcov'],
       thresholds: {

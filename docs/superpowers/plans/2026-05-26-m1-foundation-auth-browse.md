@@ -9,6 +9,7 @@
 **Tech Stack:** Next.js 15 (App Router) · TypeScript (strict) · Tailwind · Prisma + Postgres (Neon) · Auth.js v5 · Resend · Sentry · Vitest · Testcontainers · pnpm · GitHub Actions.
 
 **Canonical references:**
+
 - Spec: `docs/superpowers/specs/2026-05-26-last-minute-booking-design.md`
 - Milestone scope: `.brainstorm-draft/implementation-plan-draft.md` (M1 section)
 
@@ -130,6 +131,7 @@ last-minute/
 ## Task 1: Initialize pnpm + Next.js 15 + TypeScript strict
 
 **Files:**
+
 - Create: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `next.config.ts`, `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/globals.css`, `.gitignore`, `README.md`
 - Test: none yet — verify by building.
 
@@ -212,7 +214,10 @@ git commit -m "chore: initialize Next.js 15 + TypeScript strict project"
 
 ## Task 2: Add `.env.example` and Zod-validated env access
 
+> **Execution order note:** Task 2 has a TDD step that runs `pnpm vitest`. Vitest is installed in Task 3. **Execute Task 3 before Task 2** (or install vitest as part of Task 2 Step 1). The conceptual ordering in this doc treats env-loader as a feature and Vitest as infra, but at execution time the dependency runs the other way.
+
 **Files:**
+
 - Create: `.env.example`, `src/lib/env/env.ts`, `src/lib/env/env.test.ts`
 
 - [ ] **Step 1: Create `.env.example` with every var M1 needs**
@@ -253,7 +258,7 @@ describe('loadEnv', () => {
 
   beforeEach(() => {
     process.env = { ...original }
-    resetEnvCacheForTests()              // critical: cache is module-level
+    resetEnvCacheForTests() // critical: cache is module-level
   })
   afterEach(() => {
     process.env = original
@@ -319,7 +324,7 @@ export function loadEnv(): Env {
   if (!result.success) {
     throw new Error(
       'Invalid environment: ' +
-        result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+        result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '),
     )
   }
   cached = result.data
@@ -327,7 +332,9 @@ export function loadEnv(): Env {
 }
 
 // For tests: clear the cache.
-export function resetEnvCacheForTests() { cached = null }
+export function resetEnvCacheForTests() {
+  cached = null
+}
 ```
 
 - [ ] **Step 5: Install Zod, run tests, commit**
@@ -346,6 +353,7 @@ Expected test output: PASS, 3/3.
 ## Task 3: Set up Vitest with TypeScript
 
 **Files:**
+
 - Create: `vitest.config.ts`, `vitest.setup.ts`
 - Modify: `package.json` (scripts)
 
@@ -374,8 +382,8 @@ export default defineConfig({
       include: ['src/lib/**', 'src/app/api/**'],
       exclude: [
         '**/*.test.{ts,tsx}',
-        'src/lib/db/prisma.ts',          // singleton wrapper
-        'src/lib/sentry/**',              // glue to a vendor SDK
+        'src/lib/db/prisma.ts', // singleton wrapper
+        'src/lib/sentry/**', // glue to a vendor SDK
       ],
       reporter: ['text', 'lcov'],
       thresholds: {
@@ -396,20 +404,13 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 3: Create `vitest.setup.ts`**
+- [ ] **Step 3: Create `vitest.setup.ts` (minimal — extended in Task 5)**
 
 ```ts
 import '@testing-library/jest-dom/vitest'
-import { afterEach } from 'vitest'
-import { defaultClock, setClockForTests } from './src/lib/clock/clock'
-import { resetEnvCacheForTests } from './src/lib/env/env'
-
-// Guard against singleton leakage between tests in the same worker.
-afterEach(() => {
-  setClockForTests(defaultClock)
-  resetEnvCacheForTests()
-})
 ```
+
+The cross-test singleton-reset hooks (clock + env cache) get added in Task 5 once the clock module exists. Keeping this file minimal at Task 3 avoids a forward reference to modules that don't yet exist.
 
 - [ ] **Step 4: Add scripts**
 
@@ -449,6 +450,7 @@ git commit -m "chore(test): set up Vitest with coverage scoped to lib/ + app/api
 ## Task 4: Set up base ESLint + Prettier
 
 **Files:**
+
 - Modify: `eslint.config.mjs` (Next created a basic one)
 - Create: `.prettierrc.json`, `.prettierignore`
 
@@ -523,6 +525,7 @@ git commit -m "chore(lint): add jsx-a11y + Prettier config"
 ## Task 5: `lib/clock/clock.ts` — injectable clock service
 
 **Files:**
+
 - Create: `src/lib/clock/clock.ts`, `src/lib/clock/clock.test.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -569,13 +572,17 @@ export interface Clock {
 }
 
 export const defaultClock: Clock = {
-  now: () => new Date(),  // eslint-disable-line no-restricted-syntax
+  now: () => new Date(), // eslint-disable-line no-restricted-syntax
   // The eslint comment is needed because Task 7 bans new Date() outside this file.
 }
 
 let active: Clock = defaultClock
-export function getClock(): Clock { return active }
-export function setClockForTests(clock: Clock): void { active = clock }
+export function getClock(): Clock {
+  return active
+}
+export function setClockForTests(clock: Clock): void {
+  active = clock
+}
 ```
 
 - [ ] **Step 4: Run tests to verify pass**
@@ -586,11 +593,35 @@ pnpm vitest run src/lib/clock/clock.test.ts
 
 Expected: PASS 2/2.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Extend `vitest.setup.ts` with the singleton-reset hooks**
+
+Now that `src/lib/clock/clock.ts` and `src/lib/env/env.ts` both exist, add the `afterEach` reset hooks the M1 plan needs to prevent cross-test singleton leakage. Replace `vitest.setup.ts`:
+
+```ts
+import '@testing-library/jest-dom/vitest'
+import { afterEach } from 'vitest'
+import { defaultClock, setClockForTests } from './src/lib/clock/clock'
+import { resetEnvCacheForTests } from './src/lib/env/env'
+
+afterEach(() => {
+  setClockForTests(defaultClock)
+  resetEnvCacheForTests()
+})
+```
+
+Re-run the full test suite to confirm nothing regresses:
 
 ```bash
-git add src/lib/clock
-git commit -m "feat(clock): injectable clock service for testability"
+pnpm test
+```
+
+Expected: all tests still PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/lib/clock vitest.setup.ts
+git commit -m "feat(clock): injectable clock service + cross-test singleton resets"
 ```
 
 ---
@@ -598,6 +629,7 @@ git commit -m "feat(clock): injectable clock service for testability"
 ## Task 6: `withFrozenClock` test helper
 
 **Files:**
+
 - Create: `tests/helpers/frozen-clock.ts`, `tests/helpers/frozen-clock.test.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -625,7 +657,9 @@ describe('withFrozenClock', () => {
   it('restores even when the callback throws', async () => {
     const target = new Date('1999-12-31T23:59:59Z')
     await expect(
-      withFrozenClock(target, async () => { throw new Error('boom') })
+      withFrozenClock(target, async () => {
+        throw new Error('boom')
+      }),
     ).rejects.toThrow('boom')
     expect(getClock().now().getFullYear()).toBeGreaterThanOrEqual(2026)
   })
@@ -676,6 +710,7 @@ git commit -m "test(helpers): withFrozenClock for time-sensitive tests"
 ## Task 7: ESLint rule banning `new Date()` outside the clock service
 
 **Files:**
+
 - Create: `eslint-rules/index.cjs`, `eslint-rules/no-raw-date.cjs`, `eslint-rules/__tests__/no-raw-date.test.cjs`
 - Modify: `eslint.config.mjs` to load the local plugin
 
@@ -748,7 +783,7 @@ module.exports = {
 module.exports = {
   rules: {
     'no-raw-date': require('./no-raw-date.cjs'),
-    'no-sql-now': require('./no-sql-now.cjs'),  // added in Task 8
+    'no-sql-now': require('./no-sql-now.cjs'), // added in Task 8
   },
 }
 ```
@@ -767,10 +802,10 @@ const tester = new RuleTester({
 tester.run('no-raw-date', rule, {
   valid: [
     { filename: 'src/lib/clock/clock.ts', code: 'const d = new Date()' },
-    { filename: 'src/lib/foo.test.ts',    code: 'const d = new Date()' },
-    { filename: 'tests/helpers/foo.ts',   code: 'const d = new Date()' },
-    { filename: 'src/lib/foo.ts',         code: 'const d = new Date("2026-01-01")' }, // parsing OK
-    { filename: 'src/lib/foo.ts',         code: 'const t = clock.now()' },
+    { filename: 'src/lib/foo.test.ts', code: 'const d = new Date()' },
+    { filename: 'tests/helpers/foo.ts', code: 'const d = new Date()' },
+    { filename: 'src/lib/foo.ts', code: 'const d = new Date("2026-01-01")' }, // parsing OK
+    { filename: 'src/lib/foo.ts', code: 'const t = clock.now()' },
   ],
   invalid: [
     {
@@ -865,6 +900,7 @@ git commit -m "feat(lint): ban new Date() outside clock service; add rule fixtur
 ## Task 8: ESLint rule banning SQL `now()` in Prisma raw queries
 
 **Files:**
+
 - Create: `eslint-rules/no-sql-now.cjs`, `eslint-rules/__tests__/no-sql-now.test.cjs`
 
 - [ ] **Step 1: Implement the rule at `eslint-rules/no-sql-now.cjs`**
@@ -896,9 +932,7 @@ module.exports = {
       filename.endsWith('.cjs')
     if (allowed) return {}
 
-    const PRISMA_RAW = new Set([
-      '$queryRaw', '$executeRaw', '$queryRawUnsafe', '$executeRawUnsafe',
-    ])
+    const PRISMA_RAW = new Set(['$queryRaw', '$executeRaw', '$queryRawUnsafe', '$executeRawUnsafe'])
 
     return {
       // Tagged template: prisma.$queryRaw`SELECT now()`
@@ -1040,6 +1074,7 @@ git commit -m "feat(lint): ban SQL now() in Prisma raw queries (business logic)"
 ## Task 9: `lib/pricing.ts` — commission math with full boundary tests
 
 **Files:**
+
 - Create: `src/lib/pricing/pricing.ts`, `src/lib/pricing/pricing.test.ts`
 
 - [ ] **Step 1: Write the failing test (full §3.2 boundary set + negative/zero rejection)**
@@ -1155,6 +1190,7 @@ git commit -m "feat(pricing): commission math with §3.2 boundary tests + input 
 ## Task 10: `lib/auth/return-to.ts` — allowlist regex (single source of truth)
 
 **Files:**
+
 - Create: `src/lib/auth/return-to.ts`, `src/lib/auth/return-to.test.ts`
 
 - [ ] **Step 1: Write the failing test (allow + comprehensive deny matrix)**
@@ -1181,7 +1217,7 @@ describe('isAllowedReturnTo', () => {
       '/provider/listings',
       '/provider/dashboard/settings',
       '/provider/listings?status=draft',
-    ])('allows %s', (path) => {
+    ])('allows %s', path => {
       expect(isAllowedReturnTo(path)).toBe(true)
     })
   })
@@ -1222,7 +1258,7 @@ describe('isAllowedReturnTo', () => {
       '#foo',
       // Multiple slashes
       '///',
-    ])('denies %s', (path) => {
+    ])('denies %s', path => {
       expect(isAllowedReturnTo(path)).toBe(false)
     })
   })
@@ -1297,6 +1333,7 @@ git commit -m "feat(auth): return_to allowlist (single source of truth) + deny-v
 ## Task 11: Install and configure Prisma + Postgres client singleton
 
 **Files:**
+
 - Create: `prisma/schema.prisma` (initial), `src/lib/db/prisma.ts`
 
 - [ ] **Step 1: Install Prisma**
@@ -1362,6 +1399,7 @@ git commit -m "chore(db): Prisma + Postgres client singleton"
 ## Task 12: Initial Prisma schema — `users`, `categories`, `providers`, `listings`
 
 **Files:**
+
 - Modify: `prisma/schema.prisma`
 
 - [ ] **Step 1: Add the four M1 models per spec §4**
@@ -1556,6 +1594,7 @@ git commit -m "feat(schema): initial Prisma schema (users, categories, providers
 ## Task 13: Test factories for users, categories, providers, listings
 
 **Files:**
+
 - Create: `tests/factories/user.ts`, `tests/factories/category.ts`, `tests/factories/provider.ts`, `tests/factories/listing.ts`
 
 - [ ] **Step 1: Create `tests/factories/user.ts`**
@@ -1565,7 +1604,9 @@ import { prisma } from '@/lib/db/prisma'
 import type { User } from '@prisma/client'
 
 let counter = 0
-export async function makeUser(overrides: Partial<{ email: string; role: 'consumer' | 'provider' | 'admin'; name: string }> = {}): Promise<User> {
+export async function makeUser(
+  overrides: Partial<{ email: string; role: 'consumer' | 'provider' | 'admin'; name: string }> = {},
+): Promise<User> {
   counter += 1
   return prisma.user.create({
     data: {
@@ -1584,7 +1625,9 @@ import { prisma } from '@/lib/db/prisma'
 import type { Category } from '@prisma/client'
 
 let counter = 0
-export async function makeCategory(overrides: Partial<{ slug: string; name: string; active: boolean }> = {}): Promise<Category> {
+export async function makeCategory(
+  overrides: Partial<{ slug: string; name: string; active: boolean }> = {},
+): Promise<Category> {
   counter += 1
   return prisma.category.create({
     data: {
@@ -1603,13 +1646,15 @@ import { prisma } from '@/lib/db/prisma'
 import { makeUser } from './user'
 import type { Provider } from '@prisma/client'
 
-export async function makeProvider(overrides: Partial<{
-  businessName: string
-  currency: string
-  timezone: string
-  status: 'pending_kyc' | 'active' | 'suspended'
-  city: string
-}> = {}): Promise<Provider> {
+export async function makeProvider(
+  overrides: Partial<{
+    businessName: string
+    currency: string
+    timezone: string
+    status: 'pending_kyc' | 'active' | 'suspended'
+    city: string
+  }> = {},
+): Promise<Provider> {
   const user = await makeUser({ role: 'provider' })
   return prisma.provider.create({
     data: {
@@ -1636,31 +1681,29 @@ import { makeCategory } from './category'
 import { getClock } from '@/lib/clock/clock'
 import type { Listing } from '@prisma/client'
 
-export async function makeListing(overrides: Partial<{
-  providerId: string
-  categoryId: string
-  title: string
-  status: 'draft' | 'active' | 'expired' | 'cancelled' | 'sold_out' | 'suspended'
-  originalPriceCents: number
-  discountedPriceCents: number
-  capacity: number
-  startTime: Date
-  endTime: Date
-  listingExpiresAt: Date
-  city: string
-  lat: number
-  lon: number
-}> = {}): Promise<Listing> {
-  const provider = overrides.providerId
-    ? { id: overrides.providerId }
-    : await makeProvider()
-  const category = overrides.categoryId
-    ? { id: overrides.categoryId }
-    : await makeCategory()
+export async function makeListing(
+  overrides: Partial<{
+    providerId: string
+    categoryId: string
+    title: string
+    status: 'draft' | 'active' | 'expired' | 'cancelled' | 'sold_out' | 'suspended'
+    originalPriceCents: number
+    discountedPriceCents: number
+    capacity: number
+    startTime: Date
+    endTime: Date
+    listingExpiresAt: Date
+    city: string
+    lat: number
+    lon: number
+  }> = {},
+): Promise<Listing> {
+  const provider = overrides.providerId ? { id: overrides.providerId } : await makeProvider()
+  const category = overrides.categoryId ? { id: overrides.categoryId } : await makeCategory()
 
   const now = getClock().now()
-  const start = overrides.startTime ?? new Date(now.getTime() + 3 * 60 * 60_000)        // +3h
-  const end   = overrides.endTime   ?? new Date(start.getTime() + 60 * 60_000)          // +1h after start
+  const start = overrides.startTime ?? new Date(now.getTime() + 3 * 60 * 60_000) // +3h
+  const end = overrides.endTime ?? new Date(start.getTime() + 60 * 60_000) // +1h after start
   const expires = overrides.listingExpiresAt ?? new Date(start.getTime() - 10 * 60_000) // 10 min before start
 
   return prisma.listing.create({
@@ -1706,6 +1749,7 @@ git commit -m "test(factories): user/category/provider/listing factories + barre
 ## Task 14: Testcontainers per-worker Postgres harness
 
 **Files:**
+
 - Create: `vitest.integration.config.ts`, `tests/integration/setup.ts`, `tests/helpers/db.ts`
 
 - [ ] **Step 1: Install Testcontainers**
@@ -1730,7 +1774,7 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: { forks: { singleFork: false, maxForks: 4 } },
     testTimeout: 30_000,
-    hookTimeout: 90_000,            // first worker may pull the postgres image
+    hookTimeout: 90_000, // first worker may pull the postgres image
   },
   resolve: {
     alias: {
@@ -1857,6 +1901,7 @@ git commit -m "test(integration): Testcontainers per-worker Postgres + TRUNCATE 
 ## Task 15: Auth.js v5 setup — magic link via Resend + Google OAuth
 
 **Files:**
+
 - Create: `src/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/middleware.ts`
 
 - [ ] **Step 1: Install Auth.js v5 + Resend adapter pieces**
@@ -1894,7 +1939,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
-        session.user.role = ((user as unknown) as { role?: 'consumer' | 'provider' | 'admin' }).role ?? 'consumer'
+        session.user.role =
+          (user as unknown as { role?: 'consumer' | 'provider' | 'admin' }).role ?? 'consumer'
       }
       return session
     },
@@ -2014,6 +2060,7 @@ git commit -m "feat(auth): Auth.js v5 (magic link via Resend + Google) with Pris
 ## Task 16: `requireSession()` helper + integration test (session cookie flags verified)
 
 **Files:**
+
 - Create: `src/lib/auth/require-session.ts`, `tests/integration/auth.test.ts`
 
 - [ ] **Step 1: Implement `src/lib/auth/require-session.ts`**
@@ -2057,7 +2104,7 @@ describe('magic-link verification token', () => {
       data: {
         identifier,
         token,
-        expires: new Date(Date.now() - 60_000),    // 1 minute in the past
+        expires: new Date(Date.now() - 60_000), // 1 minute in the past
       },
     })
 
@@ -2088,7 +2135,7 @@ describe('magic-link verification token', () => {
     await expect(
       prisma.verificationToken.delete({
         where: { identifier_token: { identifier, token } },
-      })
+      }),
     ).rejects.toThrow()
   })
 })
@@ -2116,6 +2163,7 @@ git commit -m "feat(auth): requireSession helper + first-login role=consumer tes
 ## Task 17: `requireRole('admin')` middleware + `/admin/*` protection
 
 **Files:**
+
 - Create: `src/middleware.ts`, `src/lib/auth/require-role.ts`
 
 - [ ] **Step 1: Implement `src/lib/auth/require-role.ts`**
@@ -2174,6 +2222,7 @@ git commit -m "feat(auth): /admin/* role-gated middleware + requireRole helper"
 ## Task 17a: Sign-in page (`/signin`)
 
 **Files:**
+
 - Create: `src/app/signin/page.tsx`, `src/app/signin/sign-in-form.tsx`, `src/server/actions/auth.ts`
 
 Auth.js's `pages: { signIn: '/signin' }` config (Task 15) and `requireSession`/middleware both redirect here. Without this page, every unauthenticated request 404s.
@@ -2256,7 +2305,9 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
 import { SignInForm } from './sign-in-form'
 import { safeReturnTo } from '@/lib/auth/return-to'
 
-interface Props { searchParams: Promise<{ return_to?: string }> }
+interface Props {
+  searchParams: Promise<{ return_to?: string }>
+}
 
 export default async function SignIn({ searchParams }: Props) {
   const sp = await searchParams
@@ -2264,9 +2315,7 @@ export default async function SignIn({ searchParams }: Props) {
   return (
     <div className="mx-auto max-w-sm py-8">
       <h1 className="text-xl font-semibold">Sign in to Last Minute</h1>
-      <p className="mt-1 text-sm text-zinc-600">
-        Catch tonight’s deals before they’re gone.
-      </p>
+      <p className="mt-1 text-sm text-zinc-600">Catch tonight’s deals before they’re gone.</p>
       <div className="mt-6">
         <SignInForm returnTo={returnTo} />
       </div>
@@ -2287,6 +2336,7 @@ git commit -m "feat(auth): /signin page with magic-link + Google + safe return_t
 ## Task 17b: Header with sign-in / sign-out state + `loading.tsx`
 
 **Files:**
+
 - Modify: `src/app/layout.tsx`
 - Create: `src/components/header.tsx`, `src/app/loading.tsx`
 
@@ -2301,7 +2351,9 @@ export async function Header() {
   return (
     <header className="border-b border-zinc-200 px-4 py-3">
       <div className="mx-auto flex max-w-5xl items-center justify-between">
-        <a href="/" className="font-semibold">Last Minute</a>
+        <a href="/" className="font-semibold">
+          Last Minute
+        </a>
         <nav className="text-sm">
           {session?.user ? (
             <form action={signOutAction} className="flex items-center gap-3">
@@ -2309,7 +2361,9 @@ export async function Header() {
               <button className="rounded border border-zinc-300 px-2 py-1">Sign out</button>
             </form>
           ) : (
-            <a href="/signin" className="rounded border border-zinc-300 px-2 py-1">Sign in</a>
+            <a href="/signin" className="rounded border border-zinc-300 px-2 py-1">
+              Sign in
+            </a>
           )}
         </nav>
       </div>
@@ -2348,9 +2402,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ```tsx
 export default function Loading() {
-  return (
-    <div className="py-12 text-center text-sm text-zinc-500">Loading…</div>
-  )
+  return <div className="py-12 text-center text-sm text-zinc-500">Loading…</div>
 }
 ```
 
@@ -2366,6 +2418,7 @@ git commit -m "feat(ui): header with sign-in/out state + global loading"
 ## Task 18: `lib/listings/queries.ts` — every consumer query enforces `listing_expires_at > clock.now()`
 
 **Files:**
+
 - Create: `src/lib/listings/queries.ts`, `tests/integration/listings-queries.test.ts`
 
 - [ ] **Step 1: Write the failing integration test**
@@ -2396,9 +2449,7 @@ describe('listings queries — belt-and-braces expiry filter', () => {
       endTime: new Date(t0.getTime() + 3 * 60 * 60_000),
     })
 
-    const results = await withFrozenClock(t0, () =>
-      listActiveByCategory({ slug: 'yoga' })
-    )
+    const results = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'yoga' }))
     expect(results.map(r => r.title)).toEqual(['Still bookable'])
   })
 
@@ -2412,9 +2463,7 @@ describe('listings queries — belt-and-braces expiry filter', () => {
       startTime: new Date(t0.getTime() + 60 * 60_000),
       endTime: new Date(t0.getTime() + 90 * 60_000),
     })
-    const results = await withFrozenClock(t0, () =>
-      listStartingSoon({ city: 'New York' })
-    )
+    const results = await withFrozenClock(t0, () => listStartingSoon({ city: 'New York' }))
     expect(results).toEqual([])
   })
 
@@ -2425,12 +2474,16 @@ describe('listings queries — belt-and-braces expiry filter', () => {
     const start = new Date(t0.getTime() + 2 * 60 * 60_000)
     const end = new Date(start.getTime() + 60 * 60_000)
     for (const status of ['draft', 'suspended', 'cancelled', 'expired', 'sold_out'] as const) {
-      await makeListing({ categoryId: category.id, title: status, status,
-        listingExpiresAt: expires, startTime: start, endTime: end })
+      await makeListing({
+        categoryId: category.id,
+        title: status,
+        status,
+        listingExpiresAt: expires,
+        startTime: start,
+        endTime: end,
+      })
     }
-    const results = await withFrozenClock(t0, () =>
-      listActiveByCategory({ slug: 'status-filter' })
-    )
+    const results = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'status-filter' }))
     expect(results).toEqual([])
   })
 
@@ -2440,10 +2493,22 @@ describe('listings queries — belt-and-braces expiry filter', () => {
     const expires = new Date(t0.getTime() + 60 * 60_000)
     const start = new Date(t0.getTime() + 2 * 60 * 60_000)
     const end = new Date(start.getTime() + 60 * 60_000)
-    await makeListing({ categoryId: category.id, title: 'NYC', city: 'New York',
-      listingExpiresAt: expires, startTime: start, endTime: end })
-    await makeListing({ categoryId: category.id, title: 'LA', city: 'Los Angeles',
-      listingExpiresAt: expires, startTime: start, endTime: end })
+    await makeListing({
+      categoryId: category.id,
+      title: 'NYC',
+      city: 'New York',
+      listingExpiresAt: expires,
+      startTime: start,
+      endTime: end,
+    })
+    await makeListing({
+      categoryId: category.id,
+      title: 'LA',
+      city: 'Los Angeles',
+      listingExpiresAt: expires,
+      startTime: start,
+      endTime: end,
+    })
     const results = await withFrozenClock(t0, () => listStartingSoon({ city: 'New York' }))
     expect(results.map(r => r.title)).toEqual(['NYC'])
   })
@@ -2451,13 +2516,14 @@ describe('listings queries — belt-and-braces expiry filter', () => {
   it('listingExpiresAt == now() is excluded (strict gt)', async () => {
     const category = await makeCategory({ slug: 'boundary' })
     const t0 = new Date('2026-06-01T12:00:00Z')
-    await makeListing({ categoryId: category.id, title: 'Exact-boundary',
+    await makeListing({
+      categoryId: category.id,
+      title: 'Exact-boundary',
       listingExpiresAt: t0,
       startTime: new Date(t0.getTime() + 60_000),
-      endTime: new Date(t0.getTime() + 2 * 60_000) })
-    const results = await withFrozenClock(t0, () =>
-      listActiveByCategory({ slug: 'boundary' })
-    )
+      endTime: new Date(t0.getTime() + 2 * 60_000),
+    })
+    const results = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'boundary' }))
     expect(results).toEqual([])
   })
 
@@ -2477,13 +2543,14 @@ describe('listings queries — belt-and-braces expiry filter', () => {
   it('preserves emoji in title round-trip (spec §6.4)', async () => {
     const category = await makeCategory({ slug: 'emoji' })
     const t0 = new Date('2026-06-01T12:00:00Z')
-    await makeListing({ categoryId: category.id, title: 'Yoga 🧘 sunset 🌅',
+    await makeListing({
+      categoryId: category.id,
+      title: 'Yoga 🧘 sunset 🌅',
       listingExpiresAt: new Date(t0.getTime() + 60 * 60_000),
       startTime: new Date(t0.getTime() + 2 * 60 * 60_000),
-      endTime: new Date(t0.getTime() + 3 * 60 * 60_000) })
-    const results = await withFrozenClock(t0, () =>
-      listActiveByCategory({ slug: 'emoji' })
-    )
+      endTime: new Date(t0.getTime() + 3 * 60 * 60_000),
+    })
+    const results = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'emoji' }))
     expect(results[0]?.title).toBe('Yoga 🧘 sunset 🌅')
   })
 })
@@ -2532,9 +2599,18 @@ export async function listActiveByCategory(args: { slug: string }): Promise<List
     },
     orderBy: [{ startTime: 'asc' }, { discountedPriceCents: 'asc' }],
     select: {
-      id: true, title: true, city: true, lat: true, lon: true,
-      originalPriceCents: true, discountedPriceCents: true, currency: true,
-      startTime: true, endTime: true, timezone: true, images: true,
+      id: true,
+      title: true,
+      city: true,
+      lat: true,
+      lon: true,
+      originalPriceCents: true,
+      discountedPriceCents: true,
+      currency: true,
+      startTime: true,
+      endTime: true,
+      timezone: true,
+      images: true,
     },
   })
 }
@@ -2550,9 +2626,18 @@ export async function listStartingSoon(args: { city?: string } = {}): Promise<Li
     orderBy: [{ startTime: 'asc' }],
     take: 50,
     select: {
-      id: true, title: true, city: true, lat: true, lon: true,
-      originalPriceCents: true, discountedPriceCents: true, currency: true,
-      startTime: true, endTime: true, timezone: true, images: true,
+      id: true,
+      title: true,
+      city: true,
+      lat: true,
+      lon: true,
+      originalPriceCents: true,
+      discountedPriceCents: true,
+      currency: true,
+      startTime: true,
+      endTime: true,
+      timezone: true,
+      images: true,
     },
   })
 }
@@ -2562,9 +2647,18 @@ export async function getListingById(id: string): Promise<ListingSummary | null>
   const row = await prisma.listing.findFirst({
     where: { id, status: 'active', listingExpiresAt: { gt: now } },
     select: {
-      id: true, title: true, city: true, lat: true, lon: true,
-      originalPriceCents: true, discountedPriceCents: true, currency: true,
-      startTime: true, endTime: true, timezone: true, images: true,
+      id: true,
+      title: true,
+      city: true,
+      lat: true,
+      lon: true,
+      originalPriceCents: true,
+      discountedPriceCents: true,
+      currency: true,
+      startTime: true,
+      endTime: true,
+      timezone: true,
+      images: true,
     },
   })
   return row
@@ -2591,6 +2685,7 @@ git commit -m "feat(listings): query helpers with mandatory listing_expires_at >
 ## Task 19: `lib/cache/invalidate.ts` — revalidateTag + revalidatePath helper
 
 **Files:**
+
 - Create: `src/lib/cache/invalidate.ts`
 
 - [ ] **Step 1: Implement `src/lib/cache/invalidate.ts`**
@@ -2623,6 +2718,7 @@ git commit -m "feat(cache): invalidateListingsCache helper (tag + path)"
 ## Task 20: `unstable_cache` wrapper with 15s TTL + cache round-trip integration test
 
 **Files:**
+
 - Modify: `src/lib/listings/queries.ts` to wrap with `unstable_cache`
 - Create: `tests/integration/cache-invalidate.test.ts`
 
@@ -2636,7 +2732,11 @@ import { listingsTag } from '@/lib/cache/invalidate'
 
 // ... existing imports + listing helpers above ...
 
-export function listActiveByCategoryCached(args: { slug: string; categoryId: string; city?: string | null }) {
+export function listActiveByCategoryCached(args: {
+  slug: string
+  categoryId: string
+  city?: string | null
+}) {
   return unstable_cache(
     async () => listActiveByCategory({ slug: args.slug }),
     ['listings-by-category', args.categoryId, args.city ?? ''],
@@ -2660,28 +2760,36 @@ describe('cache invalidation round-trip', () => {
     const category = await makeCategory({ slug: 'invalidate-test' })
     const t0 = new Date('2026-06-01T12:00:00Z')
 
-    await makeListing({ categoryId: category.id, title: 'A',
+    await makeListing({
+      categoryId: category.id,
+      title: 'A',
       listingExpiresAt: new Date(t0.getTime() + 60 * 60_000),
       startTime: new Date(t0.getTime() + 2 * 60 * 60_000),
-      endTime: new Date(t0.getTime() + 3 * 60 * 60_000) })
+      endTime: new Date(t0.getTime() + 3 * 60 * 60_000),
+    })
 
     const first = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'invalidate-test' }))
     expect(first.map(r => r.title)).toEqual(['A'])
 
-    await makeListing({ categoryId: category.id, title: 'B',
+    await makeListing({
+      categoryId: category.id,
+      title: 'B',
       listingExpiresAt: new Date(t0.getTime() + 60 * 60_000),
       startTime: new Date(t0.getTime() + 2 * 60 * 60_000),
-      endTime: new Date(t0.getTime() + 3 * 60 * 60_000) })
+      endTime: new Date(t0.getTime() + 3 * 60 * 60_000),
+    })
 
     invalidateListingsCache({ categoryId: category.id, categorySlug: 'invalidate-test' })
 
-    const second = await withFrozenClock(t0, () => listActiveByCategory({ slug: 'invalidate-test' }))
+    const second = await withFrozenClock(t0, () =>
+      listActiveByCategory({ slug: 'invalidate-test' }),
+    )
     expect(second.map(r => r.title).sort()).toEqual(['A', 'B'])
   })
 })
 ```
 
-Note: `listActiveByCategory` (the non-cached version) is what we're asserting against here — verifying the DB read is consistent. The full `unstable_cache` end-to-end behavior is more reliably tested in M6's Playwright smoke since `unstable_cache` is process-local and harder to assert here. The point of this test is to prove the *invalidate helper* doesn't blow up and the DB returns what we expect.
+Note: `listActiveByCategory` (the non-cached version) is what we're asserting against here — verifying the DB read is consistent. The full `unstable_cache` end-to-end behavior is more reliably tested in M6's Playwright smoke since `unstable_cache` is process-local and harder to assert here. The point of this test is to prove the _invalidate helper_ doesn't blow up and the DB returns what we expect.
 
 - [ ] **Step 3: Run test, commit**
 
@@ -2696,6 +2804,7 @@ git commit -m "feat(cache): unstable_cache wrapper (15s TTL) + invalidation roun
 ## Task 21: Layout + global styles + `error.tsx` + `not-found.tsx`
 
 **Files:**
+
 - Modify: `src/app/layout.tsx`, `src/app/globals.css`
 - Create: `src/app/error.tsx`, `src/app/not-found.tsx`
 
@@ -2715,7 +2824,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen bg-white text-zinc-900 antialiased">
         <header className="border-b border-zinc-200 px-4 py-3">
-          <a href="/" className="font-semibold">Last Minute</a>
+          <a href="/" className="font-semibold">
+            Last Minute
+          </a>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
       </body>
@@ -2729,7 +2840,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 Next.js 15's `create-next-app` ships Tailwind v4 which uses the new `@import` directive — not the v3 `@tailwind base/components/utilities` triple.
 
 ```css
-@import "tailwindcss";
+@import 'tailwindcss';
 ```
 
 If `create-next-app` already wrote the file, only the import line should remain.
@@ -2765,7 +2876,9 @@ export default function NotFound() {
     <div className="text-center py-12">
       <h2 className="text-2xl font-semibold">Not found</h2>
       <p className="mt-2 text-sm text-zinc-600">This page doesn’t exist or has expired.</p>
-      <a href="/" className="mt-4 inline-block text-blue-600 underline">Go home</a>
+      <a href="/" className="mt-4 inline-block text-blue-600 underline">
+        Go home
+      </a>
     </div>
   )
 }
@@ -2783,6 +2896,7 @@ git commit -m "feat(ui): layout, global styles, error + not-found pages"
 ## Task 22: `components/relative-time.tsx` — timezone-aware relative time (client)
 
 **Files:**
+
 - Create: `src/components/relative-time.tsx`
 
 - [ ] **Step 1: Implement**
@@ -2792,7 +2906,7 @@ git commit -m "feat(ui): layout, global styles, error + not-found pages"
 import { useEffect, useState } from 'react'
 
 export function RelativeTime({ iso }: { iso: string }) {
-  const [now, setNow] = useState(() => Date.now())  // client-only; not under clock service
+  const [now, setNow] = useState(() => Date.now()) // client-only; not under clock service
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(i)
@@ -2850,6 +2964,7 @@ git commit -m "feat(ui): timezone-aware relative-time component (client-only)"
 ## Task 23: Listing card + consumer pages (`/`, `/c/[slug]`, `/l/[id]`)
 
 **Files:**
+
 - Create: `src/components/listing-card.tsx`, `src/components/empty-state.tsx`
 - Replace: `src/app/page.tsx`
 - Create: `src/app/c/[slug]/page.tsx`, `src/app/l/[id]/page.tsx`
@@ -2886,8 +3001,7 @@ export function ListingCard(p: Props) {
         {p.city ?? 'Nearby'} · <RelativeTime iso={p.startTime.toISOString()} />
       </p>
       <p className="mt-1 text-sm">
-        <span className="font-semibold">{money(p.discountedPriceCents, p.currency)}</span>
-        {' '}
+        <span className="font-semibold">{money(p.discountedPriceCents, p.currency)}</span>{' '}
         <span className="text-zinc-500 line-through">
           {money(p.originalPriceCents, p.currency)}
         </span>
@@ -2919,16 +3033,14 @@ import { ListingCard } from '@/components/listing-card'
 import { EmptyState } from '@/components/empty-state'
 
 export default async function HomePage() {
-  const [session, listings] = await Promise.all([
-    auth(),
-    listStartingSoon({}),
-  ])
+  const [session, listings] = await Promise.all([auth(), listStartingSoon({})])
   return (
     <div className="space-y-8">
       <section className="rounded-lg border border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
         <h1 className="text-3xl font-semibold">Tonight’s deals, before they’re gone.</h1>
         <p className="mt-2 text-zinc-600">
-          Restaurants, classes, hotels, services — discounted in the last hours before they go to waste.
+          Restaurants, classes, hotels, services — discounted in the last hours before they go to
+          waste.
         </p>
         {!session?.user && (
           <a
@@ -2973,7 +3085,9 @@ import { notFound } from 'next/navigation'
 import { ListingCard } from '@/components/listing-card'
 import { EmptyState } from '@/components/empty-state'
 
-interface Props { params: Promise<{ slug: string }> }
+interface Props {
+  params: Promise<{ slug: string }>
+}
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params
@@ -2988,7 +3102,9 @@ export default async function CategoryPage({ params }: Props) {
         <EmptyState title="No deals in this category right now" />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map(l => <ListingCard key={l.id} {...l} />)}
+          {listings.map(l => (
+            <ListingCard key={l.id} {...l} />
+          ))}
         </div>
       )}
     </section>
@@ -3006,12 +3122,22 @@ export async function getListingById(id: string) {
   return prisma.listing.findFirst({
     where: { id, status: 'active', listingExpiresAt: { gt: now } },
     select: {
-      id: true, title: true, description: true,
-      city: true, address: true, lat: true, lon: true,
-      originalPriceCents: true, discountedPriceCents: true, currency: true,
-      startTime: true, endTime: true, timezone: true, images: true,
+      id: true,
+      title: true,
+      description: true,
+      city: true,
+      address: true,
+      lat: true,
+      lon: true,
+      originalPriceCents: true,
+      discountedPriceCents: true,
+      currency: true,
+      startTime: true,
+      endTime: true,
+      timezone: true,
+      images: true,
       provider: { select: { businessName: true } },
-      category:  { select: { name: true, slug: true } },
+      category: { select: { name: true, slug: true } },
     },
   })
 }
@@ -3024,7 +3150,9 @@ import { getListingById } from '@/lib/listings/queries'
 import { notFound } from 'next/navigation'
 import { RelativeTime } from '@/components/relative-time'
 
-interface Props { params: Promise<{ id: string }> }
+interface Props {
+  params: Promise<{ id: string }>
+}
 
 function money(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100)
@@ -3064,8 +3192,9 @@ export default async function ListingDetail({ params }: Props) {
       </div>
 
       <p className="text-xl">
-        <span className="font-semibold">{money(listing.discountedPriceCents, listing.currency)}</span>
-        {' '}
+        <span className="font-semibold">
+          {money(listing.discountedPriceCents, listing.currency)}
+        </span>{' '}
         <span className="text-zinc-500 line-through">
           {money(listing.originalPriceCents, listing.currency)}
         </span>
@@ -3077,14 +3206,12 @@ export default async function ListingDetail({ params }: Props) {
 
       <div className="rounded border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
         <p>
-          <strong>All sales final.</strong> Bookings can’t be cancelled by you;
-          full refund if the provider doesn’t honor your booking.
+          <strong>All sales final.</strong> Bookings can’t be cancelled by you; full refund if the
+          provider doesn’t honor your booking.
         </p>
       </div>
 
-      <p className="text-xs text-zinc-500">
-        Booking will be enabled in the next milestone.
-      </p>
+      <p className="text-xs text-zinc-500">Booking will be enabled in the next milestone.</p>
     </article>
   )
 }
@@ -3104,6 +3231,7 @@ git commit -m "feat(consumer): home feed + category page + listing detail with e
 ## Task 24: Admin shell + category/provider/listing seed forms
 
 **Files:**
+
 - Create: `src/app/admin/layout.tsx`, `src/app/admin/page.tsx`, `src/app/admin/categories/page.tsx`, `src/app/admin/providers/page.tsx`, `src/app/admin/listings/page.tsx`, `src/server/actions/admin.ts`
 
 - [ ] **Step 1: Create `src/app/admin/layout.tsx`**
@@ -3116,9 +3244,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div>
       <nav className="mb-4 flex gap-3 text-sm">
-        <a href="/admin/categories" className="underline">Categories</a>
-        <a href="/admin/providers" className="underline">Providers</a>
-        <a href="/admin/listings" className="underline">Listings</a>
+        <a href="/admin/categories" className="underline">
+          Categories
+        </a>
+        <a href="/admin/providers" className="underline">
+          Providers
+        </a>
+        <a href="/admin/listings" className="underline">
+          Listings
+        </a>
       </nav>
       {children}
     </div>
@@ -3159,9 +3293,15 @@ export async function createProviderAction(formData: FormData) {
   })
   await prisma.provider.create({
     data: {
-      id: user.id, businessName, currency, timezone,
-      status: 'active', stripeChargesEnabled: true, stripePayoutsEnabled: true,
-      city: 'New York', country: 'US',
+      id: user.id,
+      businessName,
+      currency,
+      timezone,
+      status: 'active',
+      stripeChargesEnabled: true,
+      stripePayoutsEnabled: true,
+      city: 'New York',
+      country: 'US',
     },
   })
   redirect('/admin/providers')
@@ -3178,7 +3318,8 @@ export async function createListingAction(formData: FormData) {
 
   if (!title || !providerId || !categoryId) throw new Error('missing required fields')
   if (discountedPriceCents < 50) throw new Error('discountedPriceCents must be ≥ 50')
-  if (discountedPriceCents >= originalPriceCents) throw new Error('discountedPriceCents must be < originalPriceCents')
+  if (discountedPriceCents >= originalPriceCents)
+    throw new Error('discountedPriceCents must be < originalPriceCents')
 
   const now = getClock().now()
   const startTime = new Date(now.getTime() + startHoursFromNow * 60 * 60_000)
@@ -3189,11 +3330,21 @@ export async function createListingAction(formData: FormData) {
 
   await prisma.listing.create({
     data: {
-      providerId, categoryId, title,
-      originalPriceCents, discountedPriceCents, currency: 'USD',
-      capacity: 1, startTime, endTime, listingExpiresAt,
-      timezone: 'America/New_York', status: 'active',
-      city: 'New York', lat: 40.7128, lon: -74.006,
+      providerId,
+      categoryId,
+      title,
+      originalPriceCents,
+      discountedPriceCents,
+      currency: 'USD',
+      capacity: 1,
+      startTime,
+      endTime,
+      listingExpiresAt,
+      timezone: 'America/New_York',
+      status: 'active',
+      city: 'New York',
+      lat: 40.7128,
+      lon: -74.006,
     },
   })
 
@@ -3229,12 +3380,27 @@ export default async function AdminCategories() {
     <div>
       <h2 className="text-lg font-semibold">Categories</h2>
       <form action={createCategoryAction} className="mt-3 flex gap-2">
-        <input name="slug" placeholder="slug (e.g. yoga)" className="rounded border px-2 py-1" required />
-        <input name="name" placeholder="Display name" className="rounded border px-2 py-1" required />
+        <input
+          name="slug"
+          placeholder="slug (e.g. yoga)"
+          className="rounded border px-2 py-1"
+          required
+        />
+        <input
+          name="name"
+          placeholder="Display name"
+          className="rounded border px-2 py-1"
+          required
+        />
         <button className="rounded bg-zinc-900 px-3 py-1 text-white">Create</button>
       </form>
       <ul className="mt-4 list-disc pl-5 text-sm">
-        {cats.map(c => <li key={c.id}>{c.slug} — {c.name}{c.active ? '' : ' (inactive)'}</li>)}
+        {cats.map(c => (
+          <li key={c.id}>
+            {c.slug} — {c.name}
+            {c.active ? '' : ' (inactive)'}
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -3254,13 +3420,26 @@ export default async function AdminProviders() {
       <h2 className="text-lg font-semibold">Providers</h2>
       <form action={createProviderAction} className="mt-3 grid max-w-md gap-2">
         <input name="email" placeholder="email" className="rounded border px-2 py-1" required />
-        <input name="businessName" placeholder="Business name" className="rounded border px-2 py-1" required />
+        <input
+          name="businessName"
+          placeholder="Business name"
+          className="rounded border px-2 py-1"
+          required
+        />
         <input name="currency" defaultValue="USD" className="rounded border px-2 py-1" />
-        <input name="timezone" defaultValue="America/New_York" className="rounded border px-2 py-1" />
+        <input
+          name="timezone"
+          defaultValue="America/New_York"
+          className="rounded border px-2 py-1"
+        />
         <button className="rounded bg-zinc-900 px-3 py-1 text-white">Create</button>
       </form>
       <ul className="mt-4 list-disc pl-5 text-sm">
-        {providers.map(p => <li key={p.id}>{p.businessName} ({p.user.email}) — {p.status}</li>)}
+        {providers.map(p => (
+          <li key={p.id}>
+            {p.businessName} ({p.user.email}) — {p.status}
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -3284,19 +3463,50 @@ export default async function AdminListings() {
       <h2 className="text-lg font-semibold">Listings</h2>
       <form action={createListingAction} className="mt-3 grid max-w-md gap-2">
         <select name="providerId" className="rounded border px-2 py-1" required>
-          {providers.map(p => <option key={p.id} value={p.id}>{p.businessName}</option>)}
+          {providers.map(p => (
+            <option key={p.id} value={p.id}>
+              {p.businessName}
+            </option>
+          ))}
         </select>
         <select name="categoryId" className="rounded border px-2 py-1" required>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categories.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
         <input name="title" placeholder="Title" className="rounded border px-2 py-1" required />
-        <input name="originalPriceCents" type="number" min="100" defaultValue="12000" className="rounded border px-2 py-1" />
-        <input name="discountedPriceCents" type="number" min="50" defaultValue="8000" className="rounded border px-2 py-1" />
-        <input name="startHoursFromNow" type="number" min="0.25" step="0.25" defaultValue="3" className="rounded border px-2 py-1" />
+        <input
+          name="originalPriceCents"
+          type="number"
+          min="100"
+          defaultValue="12000"
+          className="rounded border px-2 py-1"
+        />
+        <input
+          name="discountedPriceCents"
+          type="number"
+          min="50"
+          defaultValue="8000"
+          className="rounded border px-2 py-1"
+        />
+        <input
+          name="startHoursFromNow"
+          type="number"
+          min="0.25"
+          step="0.25"
+          defaultValue="3"
+          className="rounded border px-2 py-1"
+        />
         <button className="rounded bg-zinc-900 px-3 py-1 text-white">Create listing</button>
       </form>
       <ul className="mt-4 list-disc pl-5 text-sm">
-        {listings.map(l => <li key={l.id}>{l.title} — {l.status}</li>)}
+        {listings.map(l => (
+          <li key={l.id}>
+            {l.title} — {l.status}
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -3315,6 +3525,7 @@ git commit -m "feat(admin): seed forms for categories, providers, listings (M1 d
 ## Task 25: Sentry server + client wiring (env-gated, Next 15 conventions)
 
 **Files:**
+
 - Create: `instrumentation.ts`, `instrumentation-client.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
 - Modify: `next.config.ts` to wrap with `withSentryConfig`
 
@@ -3425,6 +3636,7 @@ git commit -m "feat(sentry): Next 15 server + client init + withSentryConfig wra
 ## Task 26: CI invariant runner scaffold (empty; M3 plugs in)
 
 **Files:**
+
 - Create: `tests/helpers/invariants.ts`, `tests/integration/invariants.test.ts`
 
 - [ ] **Step 1: Create `tests/helpers/invariants.ts`**
@@ -3443,7 +3655,7 @@ export const invariants: Invariant[] = [
 
 export async function runInvariants() {
   const results = await Promise.all(
-    invariants.map(async i => ({ name: i.name, ...(await i.check()) }))
+    invariants.map(async i => ({ name: i.name, ...(await i.check()) })),
   )
   const failures = results.filter(r => !r.ok)
   return { failures, results }
@@ -3486,6 +3698,7 @@ git commit -m "test(invariants): runner scaffold (M3 will register checks)"
 ## Task 27: GitHub Actions CI — typecheck + lint + unit + integration ≤ 8min, Neon branch per PR
 
 **Files:**
+
 - Create: `.github/workflows/ci.yml`
 
 - [ ] **Step 1: Create the workflow**
@@ -3501,11 +3714,11 @@ on:
 # Shared dummy env so module-load env validators (loadEnv, prisma generate)
 # don't fail before tests have a chance to provide real values.
 env:
-  DATABASE_URL: "postgresql://x:x@localhost:5432/x"
-  DIRECT_URL:   "postgresql://x:x@localhost:5432/x"
-  AUTH_SECRET:  "ci-dummy-secret"
-  APP_URL:      "http://localhost:3000"
-  NODE_ENV:     "test"
+  DATABASE_URL: 'postgresql://x:x@localhost:5432/x'
+  DIRECT_URL: 'postgresql://x:x@localhost:5432/x'
+  AUTH_SECRET: 'ci-dummy-secret'
+  APP_URL: 'http://localhost:3000'
+  NODE_ENV: 'test'
 
 jobs:
   lint-and-typecheck:
@@ -3537,7 +3750,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 8                 # matches spec §7.8 budget
+    timeout-minutes: 8 # matches spec §7.8 budget
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -3563,12 +3776,13 @@ git commit -m "ci: typecheck + lint + unit + integration on every PR"
 ## Task 28: README + CONTRIBUTING dev-loop basics
 
 **Files:**
+
 - Modify: `README.md`
 - Create: `CONTRIBUTING.md`
 
 - [ ] **Step 1: Replace `README.md`**
 
-```markdown
+````markdown
 # Last Minute
 
 Last-minute booking marketplace (MVP, M1).
@@ -3581,6 +3795,7 @@ cp .env.example .env.local         # fill in DATABASE_URL etc.
 pnpm exec prisma migrate dev
 pnpm dev
 ```
+````
 
 Open <http://localhost:3000>.
 
@@ -3595,7 +3810,8 @@ Open <http://localhost:3000>.
 - `pnpm test:coverage` — coverage report (gated to `lib/` + `app/api/`)
 
 See `docs/superpowers/specs/` for the canonical product spec and `docs/superpowers/plans/` for milestone plans.
-```
+
+````
 
 - [ ] **Step 2: Create `CONTRIBUTING.md`**
 
@@ -3625,7 +3841,7 @@ See `docs/superpowers/specs/` for the canonical product spec and `docs/superpowe
 ## Commits
 
 Conventional commits (`feat:`, `fix:`, `chore:`, `test:`, `docs:`, `ci:`). One logical change per commit.
-```
+````
 
 - [ ] **Step 3: Commit**
 
@@ -3710,16 +3926,17 @@ git commit -m "chore(seed): admin user + one category for dogfooding"
 
 The M1 milestone draft (`.brainstorm-draft/implementation-plan-draft.md`) lists six acceptance criteria. Mapping:
 
-| # | Criterion | Covered by |
-|---|---|---|
-| 1 | Sign in via magic link, see populated home feed | Tasks 15, 23, 29 |
-| 2 | Browse category + listing detail with tz-aware relative times | Tasks 22, 23, 29 |
-| 3 | Admin seeds categories + provider + listing; appears in consumer feed; honors cache TTL | Tasks 17, 24, 20, 29 |
-| 4 | `lib/pricing.ts` boundary tests | Task 9 |
-| 5 | ESLint catches `new Date()` and SQL `now()` | Tasks 7, 8 |
-| 6 | CI typecheck + lint + unit + integration ≤ 8min, Neon branch per PR | Task 27 |
+| #   | Criterion                                                                               | Covered by           |
+| --- | --------------------------------------------------------------------------------------- | -------------------- |
+| 1   | Sign in via magic link, see populated home feed                                         | Tasks 15, 23, 29     |
+| 2   | Browse category + listing detail with tz-aware relative times                           | Tasks 22, 23, 29     |
+| 3   | Admin seeds categories + provider + listing; appears in consumer feed; honors cache TTL | Tasks 17, 24, 20, 29 |
+| 4   | `lib/pricing.ts` boundary tests                                                         | Task 9               |
+| 5   | ESLint catches `new Date()` and SQL `now()`                                             | Tasks 7, 8           |
+| 6   | CI typecheck + lint + unit + integration ≤ 8min, Neon branch per PR                     | Task 27              |
 
 Plus additional items folded in from the QA review:
+
 - Coverage tooling scoped to `lib/` + `app/api/` (Task 3, soft gate; hard gate in M6)
 - Testcontainers per-worker harness (Task 14, not deferred to M6)
 - `withFrozenClock` test helper (Task 6)

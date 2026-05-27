@@ -6,7 +6,7 @@ describe('loadEnv', () => {
 
   beforeEach(() => {
     process.env = { ...original }
-    resetEnvCacheForTests()              // critical: cache is module-level
+    resetEnvCacheForTests() // critical: cache is module-level
   })
   afterEach(() => {
     process.env = original

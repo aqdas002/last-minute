@@ -12,22 +12,22 @@ A two-sided web marketplace where providers list perishable last-minute inventor
 
 ### Locked-in product decisions
 
-| Decision | Choice |
-|---|---|
-| Inventory model | Two-sided marketplace; providers list themselves |
-| Verticals at launch | Generic across all categories |
-| Platforms | Mobile-responsive web; native apps deferred |
-| Discount mechanic | Provider sets a fixed discounted price |
-| Booking time window | Provider-configurable per listing |
-| Discovery | Category-browse-first; ranked by proximity + time-to-start |
-| Cancellation policy | Strict non-refundable, all sales final |
-| Commission | 15% flat, frozen per booking |
-| Payment | Stripe Connect Express, destination charges |
-| Geography | Single-city pilot; schema is location-aware to expand |
+| Decision            | Choice                                                     |
+| ------------------- | ---------------------------------------------------------- |
+| Inventory model     | Two-sided marketplace; providers list themselves           |
+| Verticals at launch | Generic across all categories                              |
+| Platforms           | Mobile-responsive web; native apps deferred                |
+| Discount mechanic   | Provider sets a fixed discounted price                     |
+| Booking time window | Provider-configurable per listing                          |
+| Discovery           | Category-browse-first; ranked by proximity + time-to-start |
+| Cancellation policy | Strict non-refundable, all sales final                     |
+| Commission          | 15% flat, frozen per booking                               |
+| Payment             | Stripe Connect Express, destination charges                |
+| Geography           | Single-city pilot; schema is location-aware to expand      |
 
 ### Acknowledged product risks (not blockers)
 
-1. **Cold-start with category browse.** PM review flagged that empty category grids on day one will hurt conversion. We accept this in v1 with the mitigations: (a) the default consumer landing surface is a mixed "starting soon near you" feed, *not* the category grid; (b) we hand-seed providers in one chosen category as the soft launch focus.
+1. **Cold-start with category browse.** PM review flagged that empty category grids on day one will hurt conversion. We accept this in v1 with the mitigations: (a) the default consumer landing surface is a mixed "starting soon near you" feed, _not_ the category grid; (b) we hand-seed providers in one chosen category as the soft launch focus.
 2. **Strict non-refundable across all categories** carries trust risk in restaurants/services (vs. hotels/fitness where it's accepted). The mitigation is the **provider-no-redeem auto-refund** in §4.
 3. **Provider onboarding friction** (Stripe KYC). The provider can prepare draft listings during the `pending_kyc` window; publishing is gated on `stripe_charges_enabled`.
 
@@ -75,7 +75,7 @@ A two-sided web marketplace where providers list perishable last-minute inventor
 
 - Server Components fetch via Prisma with `unstable_cache` keyed by `('listings', categoryId, city)` with a short TTL of **15 seconds**. The TTL exists as a safety net only — every write path also invalidates explicitly.
 - Writes invalidate by both `revalidateTag('listings:<categoryId>')` AND `revalidatePath('/c/<slug>', 'layout')` — `revalidateTag` alone does not invalidate path-level caches that don't use the same `fetch` tagging.
-- Inngest jobs that mutate listings (expiry sweeper, status flips) call the same `invalidateListingsCache(categoryId, citySlug)` helper as Server Actions. The minutely expiry sweeper invalidates *every* category whose listings expired in that tick.
+- Inngest jobs that mutate listings (expiry sweeper, status flips) call the same `invalidateListingsCache(categoryId, citySlug)` helper as Server Actions. The minutely expiry sweeper invalidates _every_ category whose listings expired in that tick.
 - **All consumer-facing listing queries also include `listing_expires_at > clock.now()` in their WHERE clause** as belt-and-braces. The cache is the optimization; the query predicate is the correctness layer. This means a 15-second stale cache cannot serve an expired listing — the query itself filters it.
 
 ---
@@ -132,6 +132,7 @@ These concerns cut across every section and are easy to forget.
 8 tables (7 business + 1 operational DLQ). UUID v7 PKs everywhere. All tables have `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` and `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
 
 ### `users`
+
 - `id` (uuid v7, PK)
 - `email` (TEXT UNIQUE NOT NULL)
 - `name`, `phone`
@@ -139,6 +140,7 @@ These concerns cut across every section and are easy to forget.
 - `created_at`, `updated_at`
 
 ### `providers` (1:1 with users where role=provider)
+
 - `id` (uuid, FK to `users.id` ON DELETE RESTRICT)
 - `business_name`, `business_description`, `contact_phone`
 - `currency` (CHAR(3), e.g. 'USD', locked at onboarding)
@@ -152,6 +154,7 @@ These concerns cut across every section and are easy to forget.
 - `created_at`, `updated_at`
 
 ### `categories`
+
 - `id` (uuid, PK)
 - `slug` (TEXT UNIQUE NOT NULL)
 - `name`, `icon_name`
@@ -162,6 +165,7 @@ These concerns cut across every section and are easy to forget.
 - `created_at`, `updated_at`
 
 ### `listings`
+
 - `id` (uuid v7, PK)
 - `provider_id` (FK)
 - `category_id` (FK)
@@ -185,6 +189,7 @@ These concerns cut across every section and are easy to forget.
   - `(provider_id, status)` — provider dashboard
 
 ### `bookings`
+
 - `id` (uuid v7, PK)
 - `listing_id` (FK ON DELETE RESTRICT)
 - `consumer_id` (FK to users ON DELETE RESTRICT)
@@ -208,6 +213,7 @@ These concerns cut across every section and are easy to forget.
   - `(stripe_checkout_session_id)` — webhook lookup
 
 ### `payment_events` (audit log + webhook idempotency)
+
 - `id` (uuid v7, PK)
 - `booking_id` (FK NULLABLE — some webhook events arrive without booking context)
 - `event_type` TEXT
@@ -221,6 +227,7 @@ These concerns cut across every section and are easy to forget.
 - **Retention:** Inngest job deletes rows where `received_at < now() - interval '90 days'` AND `processed_at IS NOT NULL`; keeps `stripe_event_id` + `event_type` indefinitely in a thinner `payment_events_archive` table.
 
 ### `webhook_dead_letter` (operational queue for Inngest publish failures)
+
 - `id` (uuid v7, PK)
 - `stripe_event_id` (TEXT UNIQUE NOT NULL — same idempotency key as `payment_events`)
 - `event_type` TEXT
@@ -233,6 +240,7 @@ These concerns cut across every section and are easy to forget.
 ### Concurrency model
 
 The booking transaction:
+
 ```
 BEGIN
   SELECT * FROM listings WHERE id=$1 FOR UPDATE;
@@ -318,6 +326,7 @@ Step  Actor       Action
 ```
 
 **Key correctness properties:**
+
 - **Stripe Checkout Session creation is OUTSIDE the row lock.** The lock is held only during the DB transaction. SWE review caught this — earlier draft held the lock across the network call.
 - **Webhook handler does only `INSERT payment_events` + fire Inngest event.** All state mutation happens in Inngest, which has retries and observability. Webhook handler is fast (sub-100ms) and Stripe-friendly. SWE-recommended pattern.
 - **Idempotency end-to-end:** `idempotencyKey` on Stripe call, `UNIQUE stripe_event_id` on webhook insert, `WHERE status = $from` guard on Inngest update.
@@ -353,16 +362,16 @@ Step  Actor       Action
 
 ### Flow 4 — Background (Inngest)
 
-| Trigger | Job |
-|---|---|
-| Cron `* * * * *` (every minute) | Expire `pending` bookings past TTL → `cancelled` with reason `consumer_no_pay`; release inventory |
-| Cron `* * * * *` | Expire active listings past `listing_expires_at` → status `expired`; revalidate caches |
-| Cron `0 * * * *` (hourly) | Reconciliation: for each `pending` booking older than 1h, call `stripe.checkout.sessions.retrieve` and reconcile. Returns `pending` bookings to `confirmed` or `cancelled` based on Stripe's view |
-| Cron `0 * * * *` (hourly) | **No-show → refund pipeline (single job, sequenced):** Job receives `$now` from `clock.now()`. (a) find `confirmed` bookings where `end_time + categories.no_show_grace_interval < $now` AND `redeemed_at IS NULL` → `updateBookingStatus('confirmed' → 'no_show')` → **immediately email the consumer**: "Your provider didn't redeem your booking. We're processing a full refund — it will show on your card within 5–10 business days." (b) issue Stripe refund as a separate Inngest step with its own retry policy → on `charge.refunded` webhook, `updateBookingStatus('no_show' → 'cancelled')` with reason `provider_no_show`. If the refund call fails after all retries, write a row to `payment_events` with `processing_error` set and alert admin; booking stays `no_show` until manual remediation. The two stages are in one job (not two daily crons) to keep ordering deterministic and the consumer email immediate. **`no_show_grace_interval`** is a per-category config (default 2h; restaurants 4h; fitness 1h) stored on `categories`. |
-| Late-redemption recovery | If a provider scans a code for a booking that has flipped to `no_show`, the redemption Server Action checks for an in-flight refund; if none yet captured, it calls `stripe.refunds.cancel(refund.id)` then `updateBookingStatus('no_show' → 'completed')`. If the refund has already settled, redemption shows the provider: "This booking was refunded at HH:MM because it was past the grace window. Contact the consumer if they still want service." |
-| Cron daily | Delete `payment_events` older than 90 days; copy event_id + type to archive table |
-| Event `stripe.event.received` | Per-event-type handler updates state |
-| Event `booking.confirmed` | Send confirmation email; schedule reminder for `start_time - 1h` via `step.sleepUntil` |
+| Trigger                         | Job                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cron `* * * * *` (every minute) | Expire `pending` bookings past TTL → `cancelled` with reason `consumer_no_pay`; release inventory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Cron `* * * * *`                | Expire active listings past `listing_expires_at` → status `expired`; revalidate caches                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Cron `0 * * * *` (hourly)       | Reconciliation: for each `pending` booking older than 1h, call `stripe.checkout.sessions.retrieve` and reconcile. Returns `pending` bookings to `confirmed` or `cancelled` based on Stripe's view                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Cron `0 * * * *` (hourly)       | **No-show → refund pipeline (single job, sequenced):** Job receives `$now` from `clock.now()`. (a) find `confirmed` bookings where `end_time + categories.no_show_grace_interval < $now` AND `redeemed_at IS NULL` → `updateBookingStatus('confirmed' → 'no_show')` → **immediately email the consumer**: "Your provider didn't redeem your booking. We're processing a full refund — it will show on your card within 5–10 business days." (b) issue Stripe refund as a separate Inngest step with its own retry policy → on `charge.refunded` webhook, `updateBookingStatus('no_show' → 'cancelled')` with reason `provider_no_show`. If the refund call fails after all retries, write a row to `payment_events` with `processing_error` set and alert admin; booking stays `no_show` until manual remediation. The two stages are in one job (not two daily crons) to keep ordering deterministic and the consumer email immediate. **`no_show_grace_interval`** is a per-category config (default 2h; restaurants 4h; fitness 1h) stored on `categories`. |
+| Late-redemption recovery        | If a provider scans a code for a booking that has flipped to `no_show`, the redemption Server Action checks for an in-flight refund; if none yet captured, it calls `stripe.refunds.cancel(refund.id)` then `updateBookingStatus('no_show' → 'completed')`. If the refund has already settled, redemption shows the provider: "This booking was refunded at HH:MM because it was past the grace window. Contact the consumer if they still want service."                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Cron daily                      | Delete `payment_events` older than 90 days; copy event_id + type to archive table                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Event `stripe.event.received`   | Per-event-type handler updates state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Event `booking.confirmed`       | Send confirmation email; schedule reminder for `start_time - 1h` via `step.sleepUntil`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 **The no-show → refund pipeline** is the only consumer-protection refund case we allow in v1. The hourly cadence (rather than daily) means the consumer hears within an hour of the no-show, not 24h+ later.
 
@@ -411,6 +420,7 @@ Step  Actor       Action
 **Double-tap on Book.** Partial unique index rejects the second insert with Postgres error code `23505`. Server Action catches `23505`, looks up the existing pending booking, redirects to its existing Stripe Checkout Session URL. The user resumes their own checkout, never sees an error.
 
 **Provider edits listing during in-flight pending booking.** Edits are split into two classes:
+
 - **Non-material edits** (title, description, images, address text formatting): **allowed at any time.** These don't affect what a booked consumer is paying for.
 - **Material edits** (`discounted_price_cents`, `original_price_cents`, `capacity`, `start_time`, `end_time`, `listing_expires_at`, `lat`/`lon` move, `category_id`): **blocked when active `pending` or `confirmed` bookings exist.** Provider sees an inline form-level message ("This listing has 3 active bookings. Cancel the listing to change price, time, or capacity."), not a generic toast. Server Action rejects with a typed error and the form re-renders with the message in place.
 - If provider sets `status='cancelled'` on a listing with active bookings, we keep `pending` rows alive (Stripe could still confirm them); on confirmation, the no-show pipeline (§5.4) catches them within an hour.
@@ -508,6 +518,7 @@ Auth via Playwright `storageState` seeded by setup script — no magic-link danc
 ### 7.6 Manual smoke — pre-release checklist
 
 `docs/release-checklist.md`:
+
 - Real Stripe Test end-to-end on staging (book → refund via dashboard → assert cancelled).
 - All transactional emails opened in Gmail, Apple Mail, Outlook web — visual check.
 - Provider Connect Express onboarding on fresh email.
@@ -531,18 +542,18 @@ Visual regression (Percy/Chromatic), load/perf (k6), full WCAG audit. We do run 
 
 ## 8. Open risks & deferred work
 
-| Item | Risk | Defer to |
-|---|---|---|
-| Capacity-on-listings breaks for capacity > ~10 | Throughput bottleneck on hot listings | When inventory data shows it |
-| Cold-start with category browse on day one | Empty feeds hurt early retention | Mitigate via mixed "starting soon" landing surface; consider per-category soft-launches |
-| Strict non-refundable across all verticals | Trust risk in restaurants/services | Watch consumer complaints; revisit refund window per category |
-| Multi-currency | Limits geographic expansion | When we add a second market |
-| Reviews / ratings | Trust signal gap | v1.1 |
-| Search bar | Discovery gap | When inventory exceeds category-browse scrollable size |
-| QR redemption | Friction in busy venues | v1.1 |
-| Native apps | Push notifications, app store presence | After we validate demand |
-| Per-category `metadata` schema validation | Garbage data risk | Add `pg_jsonschema` once >3 categories live |
-| Image management (deletes/CDN purge) | Storage leak | When provider edit/delete volume warrants |
+| Item                                           | Risk                                   | Defer to                                                                                |
+| ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Capacity-on-listings breaks for capacity > ~10 | Throughput bottleneck on hot listings  | When inventory data shows it                                                            |
+| Cold-start with category browse on day one     | Empty feeds hurt early retention       | Mitigate via mixed "starting soon" landing surface; consider per-category soft-launches |
+| Strict non-refundable across all verticals     | Trust risk in restaurants/services     | Watch consumer complaints; revisit refund window per category                           |
+| Multi-currency                                 | Limits geographic expansion            | When we add a second market                                                             |
+| Reviews / ratings                              | Trust signal gap                       | v1.1                                                                                    |
+| Search bar                                     | Discovery gap                          | When inventory exceeds category-browse scrollable size                                  |
+| QR redemption                                  | Friction in busy venues                | v1.1                                                                                    |
+| Native apps                                    | Push notifications, app store presence | After we validate demand                                                                |
+| Per-category `metadata` schema validation      | Garbage data risk                      | Add `pg_jsonschema` once >3 categories live                                             |
+| Image management (deletes/CDN purge)           | Storage leak                           | When provider edit/delete volume warrants                                               |
 
 ---
 
