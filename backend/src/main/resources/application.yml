@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: last-minute
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lastminute}
+    username: ${DATABASE_USER:lastminute}
+    password: ${DATABASE_PASSWORD:lastminute}
+  jpa:
+    hibernate:
+      ddl-auto: validate                 # Flyway owns schema
+    open-in-view: false                  # avoid OSIV foot-gun
+    properties:
+      hibernate.format_sql: true
+  flyway:
+    enabled: true
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${AUTH_GOOGLE_ID:}
+            client-secret: ${AUTH_GOOGLE_SECRET:}
+            scope: openid,profile,email
+
+server:
+  port: 8080
+  forward-headers-strategy: framework   # behind Fly.io proxy
+
+app:
+  base-url: ${APP_URL:http://localhost:8080}
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  resend:
+    api-key: ${RESEND_API_KEY:}
+    from: ${EMAIL_FROM:dev@local}
+  commission-percent: 15
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:development}
+  traces-sample-rate: 0.1
+  enabled: false                          # explicit; flip to true when DSN is set in prod
