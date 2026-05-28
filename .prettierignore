@@ -1,7 +1,0 @@
-.next
-node_modules
-coverage
-prisma/migrations
-pnpm-lock.yaml
-.brainstorm-draft
-.superpowers
