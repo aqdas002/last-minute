@@ -17,14 +17,9 @@ spring:
     store-type: jdbc
     jdbc:
       initialize-schema: always
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${AUTH_GOOGLE_ID:}
-            client-secret: ${AUTH_GOOGLE_SECRET:}
-            scope: openid,profile,email
+  # Google OAuth2 client wires up in Task 9 (auth). When AUTH_GOOGLE_ID is unset,
+  # Spring's validator rejects an empty registration, so we omit it entirely here
+  # and let Task 9 introduce it inside a profile or a @Conditional config.
 
 server:
   port: 8080
