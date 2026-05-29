@@ -83,6 +83,18 @@ public class ProviderListingController {
     return ResponseEntity.ok(ListingDto.from(svc.publish(principal.id(), id)));
   }
 
+  @PostMapping("/{id}/suspend")
+  public ResponseEntity<ListingDto> suspend(
+      @AuthenticationPrincipal CurrentUser principal, @PathVariable UUID id) {
+    return ResponseEntity.ok(ListingDto.from(svc.suspend(principal.id(), id)));
+  }
+
+  @PostMapping("/{id}/unsuspend")
+  public ResponseEntity<ListingDto> unsuspend(
+      @AuthenticationPrincipal CurrentUser principal, @PathVariable UUID id) {
+    return ResponseEntity.ok(ListingDto.from(svc.unsuspend(principal.id(), id)));
+  }
+
   /** Spec §5 Flow 2: live "you receive $X.XX after our 15%" math for the listing-create UI. */
   @GetMapping("/preview-fee")
   public ResponseEntity<FeePreview> previewFee(@RequestParam long priceCents) {

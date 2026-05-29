@@ -4,6 +4,8 @@ import {
   myListings,
   createMyListing,
   publishListing,
+  suspendListing,
+  unsuspendListing,
   previewFee,
   type CreateListingBody,
 } from '../../api/providers'
@@ -21,6 +23,14 @@ export function ProviderListingsPage() {
 
   const publishMut = useMutation({
     mutationFn: (id: string) => publishListing(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-listings'] }),
+  })
+  const suspendMut = useMutation({
+    mutationFn: (id: string) => suspendListing(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-listings'] }),
+  })
+  const unsuspendMut = useMutation({
+    mutationFn: (id: string) => unsuspendListing(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-listings'] }),
   })
 
@@ -42,7 +52,15 @@ export function ProviderListingsPage() {
         ) : (
           <ul className="space-y-2">
             {listings.map((l) => (
-              <ListingRow key={l.id} l={l} onPublish={() => publishMut.mutate(l.id)} publishing={publishMut.isPending} />
+              <ListingRow
+                key={l.id}
+                l={l}
+                onPublish={() => publishMut.mutate(l.id)}
+                onSuspend={() => suspendMut.mutate(l.id)}
+                onUnsuspend={() => unsuspendMut.mutate(l.id)}
+                publishing={publishMut.isPending}
+                toggling={suspendMut.isPending || unsuspendMut.isPending}
+              />
             ))}
           </ul>
         )}
@@ -54,11 +72,17 @@ export function ProviderListingsPage() {
 function ListingRow({
   l,
   onPublish,
+  onSuspend,
+  onUnsuspend,
   publishing,
+  toggling,
 }: {
   l: Listing
   onPublish: () => void
+  onSuspend: () => void
+  onUnsuspend: () => void
   publishing: boolean
+  toggling: boolean
 }) {
   const [editing, setEditing] = useState(false)
   return (
@@ -75,13 +99,33 @@ function ListingRow({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {!editing && (l.status === 'draft' || l.status === 'active') && (
+          {!editing && (l.status === 'draft' || l.status === 'active' || l.status === 'suspended') && (
             <button
               type="button"
               onClick={() => setEditing(true)}
               className="rounded border border-zinc-300 px-2 py-1 text-xs"
             >
               Edit
+            </button>
+          )}
+          {!editing && l.status === 'active' && (
+            <button
+              type="button"
+              disabled={toggling}
+              onClick={onSuspend}
+              className="rounded border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50"
+            >
+              Hide
+            </button>
+          )}
+          {!editing && l.status === 'suspended' && (
+            <button
+              type="button"
+              disabled={toggling}
+              onClick={onUnsuspend}
+              className="rounded border border-zinc-900 px-2 py-1 text-xs text-zinc-900 disabled:opacity-50"
+            >
+              Show
             </button>
           )}
           {!editing && l.status === 'draft' && (

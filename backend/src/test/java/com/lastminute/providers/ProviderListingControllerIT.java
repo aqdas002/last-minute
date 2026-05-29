@@ -242,6 +242,74 @@ class ProviderListingControllerIT extends IntegrationTestBase {
   }
 
   @Test
+  void suspend_active_listing_flips_to_suspended() throws Exception {
+    mvc.perform(
+            post("/api/providers/me/listings")
+                .with(asProvider())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(validCreateBody())))
+        .andExpect(status().isOk());
+    UUID id = listings.findAll().get(0).getId();
+    mvc.perform(post("/api/providers/me/listings/" + id + "/publish").with(asProvider()))
+        .andExpect(status().isOk());
+
+    mvc.perform(post("/api/providers/me/listings/" + id + "/suspend").with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("suspended"));
+    assertThat(listings.findById(id).orElseThrow().getStatus())
+        .isEqualTo(ListingStatus.suspended);
+  }
+
+  @Test
+  void unsuspend_returns_to_active() throws Exception {
+    mvc.perform(
+            post("/api/providers/me/listings")
+                .with(asProvider())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(validCreateBody())))
+        .andExpect(status().isOk());
+    UUID id = listings.findAll().get(0).getId();
+    mvc.perform(post("/api/providers/me/listings/" + id + "/publish").with(asProvider()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/providers/me/listings/" + id + "/suspend").with(asProvider()))
+        .andExpect(status().isOk());
+
+    mvc.perform(post("/api/providers/me/listings/" + id + "/unsuspend").with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("active"));
+  }
+
+  @Test
+  void suspend_of_draft_returns_409_NOT_ACTIVE() throws Exception {
+    mvc.perform(
+            post("/api/providers/me/listings")
+                .with(asProvider())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(validCreateBody())))
+        .andExpect(status().isOk());
+    UUID id = listings.findAll().get(0).getId();
+
+    mvc.perform(post("/api/providers/me/listings/" + id + "/suspend").with(asProvider()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void unsuspend_of_active_returns_409_NOT_SUSPENDED() throws Exception {
+    mvc.perform(
+            post("/api/providers/me/listings")
+                .with(asProvider())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(validCreateBody())))
+        .andExpect(status().isOk());
+    UUID id = listings.findAll().get(0).getId();
+    mvc.perform(post("/api/providers/me/listings/" + id + "/publish").with(asProvider()))
+        .andExpect(status().isOk());
+
+    mvc.perform(post("/api/providers/me/listings/" + id + "/unsuspend").with(asProvider()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
   void preview_fee_returns_15_percent_split() throws Exception {
     mvc.perform(
             get("/api/providers/me/listings/preview-fee")

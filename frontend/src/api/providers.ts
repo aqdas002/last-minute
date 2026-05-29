@@ -68,5 +68,11 @@ export const editMyListing = (id: string, body: EditListingBody) =>
     body: JSON.stringify(body),
   })
 
+export const suspendListing = (id: string) =>
+  api<Listing>(`/api/providers/me/listings/${id}/suspend`, { method: 'POST' })
+
+export const unsuspendListing = (id: string) =>
+  api<Listing>(`/api/providers/me/listings/${id}/unsuspend`, { method: 'POST' })
+
 export const previewFee = (priceCents: number) =>
   api<FeePreview>(`/api/providers/me/listings/preview-fee?priceCents=${priceCents}`)

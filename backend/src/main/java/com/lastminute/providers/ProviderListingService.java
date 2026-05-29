@@ -140,6 +140,38 @@ public class ProviderListingService {
     return listings.save(l);
   }
 
+  /**
+   * Hide an active listing from the consumer browse without cancelling existing bookings.
+   * Suspended listings keep their bookings — those have already been paid for and the provider
+   * still has to honor them. Suspend just stops *new* bookings.
+   */
+  @Transactional
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  public Listing suspend(UUID providerId, UUID listingId) {
+    Listing l = findOwn(providerId, listingId);
+    l.getCategory().getSlug();
+    l.getProvider().getBusinessName();
+    if (l.getStatus() != ListingStatus.active) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "NOT_ACTIVE");
+    }
+    l.setStatus(ListingStatus.suspended);
+    return listings.save(l);
+  }
+
+  /** Reverse of {@link #suspend} — bring a suspended listing back into the browse feed. */
+  @Transactional
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  public Listing unsuspend(UUID providerId, UUID listingId) {
+    Listing l = findOwn(providerId, listingId);
+    l.getCategory().getSlug();
+    l.getProvider().getBusinessName();
+    if (l.getStatus() != ListingStatus.suspended) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "NOT_SUSPENDED");
+    }
+    l.setStatus(ListingStatus.active);
+    return listings.save(l);
+  }
+
   private Listing findOwn(UUID providerId, UUID listingId) {
     Listing l =
         listings
