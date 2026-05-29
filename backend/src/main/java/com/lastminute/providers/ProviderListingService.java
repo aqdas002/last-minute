@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,6 +95,7 @@ public class ProviderListingService {
   }
 
   @Transactional
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
   public Listing edit(UUID providerId, UUID listingId, EditRequest req) {
     Listing l = findOwn(providerId, listingId);
     // Eager-touch for DTO serialization outside the tx.
@@ -122,6 +124,7 @@ public class ProviderListingService {
   }
 
   @Transactional
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
   public Listing publish(UUID providerId, UUID listingId) {
     Listing l = findOwn(providerId, listingId);
     Provider p = l.getProvider();
