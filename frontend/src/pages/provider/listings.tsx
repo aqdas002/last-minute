@@ -7,7 +7,8 @@ import {
   previewFee,
   type CreateListingBody,
 } from '../../api/providers'
-import { allCategories } from '../../api/listings'
+import { allCategories, type Listing } from '../../api/listings'
+import { EditListingForm } from '../../components/edit-listing-form'
 
 function money(cents: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100)
@@ -40,38 +41,62 @@ export function ProviderListingsPage() {
           <p className="text-sm text-zinc-500">No listings yet.</p>
         ) : (
           <ul className="space-y-2">
-            {listings.map(l => (
-              <li
-                key={l.id}
-                className="flex items-center justify-between gap-3 rounded border border-zinc-200 p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-medium">{l.title}</p>
-                    <StatusPill status={l.status} />
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    {l.categoryName} · {money(l.discountedPriceCents, l.currency)} (was{' '}
-                    {money(l.originalPriceCents, l.currency)})
-                  </p>
-                </div>
-                {l.status === 'draft' ? (
-                  <button
-                    disabled={publishMut.isPending}
-                    onClick={() => publishMut.mutate(l.id)}
-                    className="rounded bg-zinc-900 px-3 py-1 text-sm text-white disabled:opacity-50"
-                  >
-                    {publishMut.isPending ? 'Publishing…' : 'Publish'}
-                  </button>
-                ) : (
-                  <span className="text-xs text-zinc-400">—</span>
-                )}
-              </li>
+            {listings.map((l) => (
+              <ListingRow key={l.id} l={l} onPublish={() => publishMut.mutate(l.id)} publishing={publishMut.isPending} />
             ))}
           </ul>
         )}
       </section>
     </div>
+  )
+}
+
+function ListingRow({
+  l,
+  onPublish,
+  publishing,
+}: {
+  l: Listing
+  onPublish: () => void
+  publishing: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  return (
+    <li className="space-y-2 rounded border border-zinc-200 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate font-medium">{l.title}</p>
+            <StatusPill status={l.status} />
+          </div>
+          <p className="text-xs text-zinc-500">
+            {l.categoryName} · {money(l.discountedPriceCents, l.currency)} (was{' '}
+            {money(l.originalPriceCents, l.currency)})
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {!editing && (l.status === 'draft' || l.status === 'active') && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded border border-zinc-300 px-2 py-1 text-xs"
+            >
+              Edit
+            </button>
+          )}
+          {!editing && l.status === 'draft' && (
+            <button
+              disabled={publishing}
+              onClick={onPublish}
+              className="rounded bg-zinc-900 px-3 py-1 text-sm text-white disabled:opacity-50"
+            >
+              {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          )}
+        </div>
+      </div>
+      {editing && <EditListingForm listing={l} onClose={() => setEditing(false)} />}
+    </li>
   )
 }
 

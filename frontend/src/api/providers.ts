@@ -51,5 +51,22 @@ export const createMyListing = (body: CreateListingBody) =>
 export const publishListing = (id: string) =>
   api<Listing>(`/api/providers/me/listings/${id}/publish`, { method: 'POST' })
 
+export type EditListingBody = Partial<{
+  title: string
+  description: string
+  originalPriceCents: number
+  discountedPriceCents: number
+  capacity: number
+  startTime: string
+  endTime: string
+  listingExpiresAt: string
+}>
+
+export const editMyListing = (id: string, body: EditListingBody) =>
+  api<Listing>(`/api/providers/me/listings/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+
 export const previewFee = (priceCents: number) =>
   api<FeePreview>(`/api/providers/me/listings/preview-fee?priceCents=${priceCents}`)
