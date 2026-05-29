@@ -5,6 +5,11 @@ import { HomePage } from './pages/home'
 import { CategoryPage } from './pages/category'
 import { ListingPage } from './pages/listing'
 import { SignInPage } from './pages/signin'
+import { ProviderSignUpPage } from './pages/provider/signup'
+import { ProviderOnboardingPage } from './pages/provider/onboarding'
+import { ProviderOnboardingReturnPage } from './pages/provider/onboarding-return'
+import { ProviderDashboardPage } from './pages/provider/dashboard'
+import { ProviderListingsPage } from './pages/provider/listings'
 
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: false } },
@@ -21,6 +26,14 @@ export default function App() {
             <Route path="/c/:slug" element={<CategoryPage />} />
             <Route path="/l/:id" element={<ListingPage />} />
             <Route path="/signin" element={<SignInPage />} />
+            <Route path="/provider/signup" element={<ProviderSignUpPage />} />
+            <Route path="/provider/onboarding" element={<ProviderOnboardingPage />} />
+            <Route
+              path="/provider/onboarding/return"
+              element={<ProviderOnboardingReturnPage />}
+            />
+            <Route path="/provider/dashboard" element={<ProviderDashboardPage />} />
+            <Route path="/provider/listings" element={<ProviderListingsPage />} />
             <Route path="*" element={<p>Not found.</p>} />
           </Routes>
         </main>

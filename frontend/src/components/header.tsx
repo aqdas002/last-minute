@@ -7,11 +7,11 @@ export function Header() {
         <Link to="/" className="font-semibold">
           Last Minute
         </Link>
-        <nav className="text-sm">
-          <Link
-            to="/signin"
-            className="rounded border border-zinc-300 px-2 py-1"
-          >
+        <nav className="flex items-center gap-3 text-sm">
+          <Link to="/provider/signup" className="text-zinc-700 hover:underline">
+            For providers
+          </Link>
+          <Link to="/signin" className="rounded border border-zinc-300 px-2 py-1">
             Sign in
           </Link>
         </nav>
