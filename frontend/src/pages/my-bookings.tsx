@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { myBookings } from '../api/bookings'
+import { RefundRequestButton } from '../components/refund-request-button'
 
 function money(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100)
@@ -40,23 +41,26 @@ export function MyBookingsPage() {
         {data.map(b => (
           <li
             key={b.id}
-            className="flex items-center justify-between rounded border border-zinc-200 p-3"
+            className="space-y-2 rounded border border-zinc-200 p-3"
           >
-            <div>
-              <p className="font-medium">{b.listingTitle}</p>
-              <p className="text-xs text-zinc-500">
-                {money(b.amountPaidCents, b.currency)} ·{' '}
-                {new Date(b.startTime).toLocaleString()}
-              </p>
-              {b.status === 'confirmed' && b.redemptionCode && (
-                <p className="mt-1 font-mono text-sm">code: {b.redemptionCode}</p>
-              )}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{b.listingTitle}</p>
+                <p className="text-xs text-zinc-500">
+                  {money(b.amountPaidCents, b.currency)} ·{' '}
+                  {new Date(b.startTime).toLocaleString()}
+                </p>
+                {b.status === 'confirmed' && b.redemptionCode && (
+                  <p className="mt-1 font-mono text-sm">code: {b.redemptionCode}</p>
+                )}
+              </div>
+              <span
+                className={`rounded px-2 py-1 text-xs font-medium ${statusPill[b.status] ?? 'bg-zinc-100'}`}
+              >
+                {b.status}
+              </span>
             </div>
-            <span
-              className={`rounded px-2 py-1 text-xs font-medium ${statusPill[b.status] ?? 'bg-zinc-100'}`}
-            >
-              {b.status}
-            </span>
+            <RefundRequestButton bookingId={b.id} bookingStatus={b.status} />
           </li>
         ))}
       </ul>

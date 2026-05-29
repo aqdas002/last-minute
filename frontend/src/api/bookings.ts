@@ -70,3 +70,35 @@ export const redeemCode = (code: string) =>
     method: 'POST',
     body: JSON.stringify({ code }),
   })
+
+export type RefundReason = 'provider_no_show' | 'quality_issue' | 'duplicate_charge' | 'other'
+export type RefundRequestStatus = 'open' | 'approved' | 'denied' | 'auto_resolved'
+
+export type FiledResult = {
+  requestId: string
+  status: RefundRequestStatus
+  createdAt: string
+  message: string
+}
+
+export type MyRefundRequest = {
+  id: string
+  reason: RefundReason
+  status: RefundRequestStatus
+  adminNotes: string | null
+  createdAt: string
+  resolvedAt: string | null
+}
+
+export const fileRefundRequest = (
+  bookingId: string,
+  reason: RefundReason,
+  details?: string,
+) =>
+  api<FiledResult>(`/api/bookings/${bookingId}/refund-request`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, details: details ?? null }),
+  })
+
+export const getRefundRequests = (bookingId: string) =>
+  api<MyRefundRequest[]>(`/api/bookings/${bookingId}/refund-request`)

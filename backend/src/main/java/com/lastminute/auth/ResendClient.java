@@ -137,6 +137,60 @@ public class ResendClient {
         .toBodilessEntity();
   }
 
+  /** Spec §6.4: notify ops when a consumer files a refund request. */
+  public void sendRefundRequestFiled(
+      String adminEmail,
+      String consumerEmail,
+      String listingTitle,
+      String reason,
+      String details,
+      String bookingId,
+      int amountCents,
+      String currency) {
+    if (apiKey == null || apiKey.isBlank()) {
+      LOG.warn(
+          "[dev] would email {} -> refund request from {} for '{}' (reason={}, booking={}, amount={} {})",
+          adminEmail,
+          consumerEmail,
+          listingTitle,
+          reason,
+          bookingId,
+          amountCents,
+          currency);
+      return;
+    }
+    String body =
+        "<p><strong>"
+            + consumerEmail
+            + "</strong> filed a refund request.</p>"
+            + "<p>Listing: "
+            + listingTitle
+            + "<br>Reason: <strong>"
+            + reason
+            + "</strong><br>Amount: "
+            + currency
+            + " "
+            + (amountCents / 100.0)
+            + "<br>Booking id: <code>"
+            + bookingId
+            + "</code></p>"
+            + (details == null || details.isBlank() ? "" : "<p><em>" + details + "</em></p>")
+            + "<p>Action: refund via Stripe Dashboard; the resulting webhook will auto-close"
+            + " this request.</p>";
+    http
+        .post()
+        .uri("/emails")
+        .header("Authorization", "Bearer " + apiKey)
+        .body(
+            Map.of(
+                "from", from,
+                "to", adminEmail,
+                "subject", "Refund request: " + listingTitle,
+                "html", body))
+        .retrieve()
+        .toBodilessEntity();
+  }
+
   /** Spec §5 Flow 2 step 6: notify the provider once Stripe Connect KYC clears. */
   public void sendProviderLive(String to) {
     if (apiKey == null || apiKey.isBlank()) {
