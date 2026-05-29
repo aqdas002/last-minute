@@ -155,6 +155,75 @@ class ListingQueryServiceIT extends IntegrationTestBase {
   }
 
   @Test
+  void search_matches_title_substring_case_insensitive() {
+    Category cat = f.category("search-title");
+    f.listing(
+        ListingOptions.b()
+            .category(cat)
+            .title("Sunset Yoga Class")
+            .now(T0)
+            .expiresAt(T0.plusSeconds(3600))
+            .startTime(T0.plusSeconds(2 * 3600))
+            .endTime(T0.plusSeconds(3 * 3600))
+            .build());
+    f.listing(
+        ListingOptions.b()
+            .category(cat)
+            .title("Morning Run")
+            .now(T0)
+            .expiresAt(T0.plusSeconds(3600))
+            .startTime(T0.plusSeconds(2 * 3600))
+            .endTime(T0.plusSeconds(3 * 3600))
+            .build());
+    assertThat(q.search("yoga", null, null))
+        .extracting(Listing::getTitle)
+        .containsExactly("Sunset Yoga Class");
+    assertThat(q.search("YOGA", null, null)).hasSize(1);
+  }
+
+  @Test
+  void search_excludes_expired_listings() {
+    Category cat = f.category("search-expiry");
+    f.listing(
+        ListingOptions.b()
+            .category(cat)
+            .title("Expired Yoga Class")
+            .now(T0)
+            .expiresAt(T0.minusSeconds(1))
+            .startTime(T0.plusSeconds(60))
+            .endTime(T0.plusSeconds(120))
+            .build());
+    assertThat(q.search("yoga", null, null)).isEmpty();
+  }
+
+  @Test
+  void search_combines_with_category_filter() {
+    Category yoga = f.category("yoga-cat");
+    Category run = f.category("run-cat");
+    f.listing(
+        ListingOptions.b()
+            .category(yoga)
+            .title("Power Class")
+            .now(T0)
+            .expiresAt(T0.plusSeconds(3600))
+            .startTime(T0.plusSeconds(2 * 3600))
+            .endTime(T0.plusSeconds(3 * 3600))
+            .build());
+    f.listing(
+        ListingOptions.b()
+            .category(run)
+            .title("Power Run")
+            .now(T0)
+            .expiresAt(T0.plusSeconds(3600))
+            .startTime(T0.plusSeconds(2 * 3600))
+            .endTime(T0.plusSeconds(3 * 3600))
+            .build());
+    assertThat(q.search("power", null, "yoga-cat"))
+        .extracting(Listing::getTitle)
+        .containsExactly("Power Class");
+  }
+
+  @Test
   void preserves_emoji_in_title_round_trip() {
     Category cat = f.category("emoji");
     f.listing(

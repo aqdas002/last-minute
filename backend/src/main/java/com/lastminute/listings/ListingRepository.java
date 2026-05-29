@@ -61,4 +61,31 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
       @Param("now") Instant now,
       @Param("id") UUID id,
       @Param("status") ListingStatus status);
+
+  /**
+   * Keyword search across title + description. Case-insensitive substring match. Bounded by
+   * {@code listing_expires_at > now} and optional filters. Small dataset for MVP — Postgres
+   * sequential scan is fine; introduce {@code pg_trgm} GIN index when result counts justify it.
+   */
+  @Query(
+      """
+      SELECT l FROM Listing l
+        JOIN FETCH l.category c
+        JOIN FETCH l.provider
+      WHERE l.status = :status
+        AND l.listingExpiresAt > :now
+        AND (:city IS NULL OR l.city = :city)
+        AND (:slug IS NULL OR c.slug = :slug)
+        AND (
+          LOWER(l.title) LIKE LOWER(CONCAT('%', :q, '%'))
+          OR LOWER(COALESCE(l.description, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+        )
+      ORDER BY l.startTime ASC, l.discountedPriceCents ASC
+      """)
+  List<Listing> search(
+      @Param("now") Instant now,
+      @Param("q") String q,
+      @Param("city") String city,
+      @Param("slug") String slug,
+      @Param("status") ListingStatus status);
 }

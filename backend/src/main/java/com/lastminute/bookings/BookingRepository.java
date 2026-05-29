@@ -56,10 +56,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
   @Query(
       """
       SELECT b FROM Booking b
-      WHERE b.status = com.lastminute.bookings.BookingStatus.pending
+      WHERE b.status = :status
         AND b.pendingExpiresAt < :now
       """)
-  List<Booking> findExpiredPending(@Param("now") Instant now);
+  List<Booking> findExpiredPending(
+      @Param("now") Instant now, @Param("status") BookingStatus status);
 
   /** Tightened M3 predicate for provider material-edit + currency-self-correct. */
   boolean existsByListing_IdAndStatusIn(UUID listingId, List<BookingStatus> statuses);
@@ -71,11 +72,15 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
       """
       SELECT b FROM Booking b
         JOIN FETCH b.listing l
-      WHERE b.status = com.lastminute.bookings.BookingStatus.confirmed
+        JOIN FETCH b.consumer
+      WHERE b.status = :status
         AND b.reminderSentAt IS NULL
         AND l.startTime BETWEEN :from AND :to
       """)
-  List<Booking> findRemindersDue(@Param("from") Instant from, @Param("to") Instant to);
+  List<Booking> findRemindersDue(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("status") BookingStatus status);
 
   /** Use the explicit FOR UPDATE lock for the listing row inside reserveSpot. Repository-level
    *  finder so the lock is acquired by JPA, not by hand-rolled SQL. */

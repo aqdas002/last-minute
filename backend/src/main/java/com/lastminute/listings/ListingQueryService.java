@@ -37,4 +37,9 @@ public class ListingQueryService {
   public Optional<Listing> byId(UUID id) {
     return repo.findActiveById(Instant.now(clock), id, ListingStatus.active);
   }
+
+  /** Free-text search; q is required (controller enforces min length). */
+  public List<Listing> search(String q, String city, String slug) {
+    return repo.search(Instant.now(clock), q, city, slug, ListingStatus.active);
+  }
 }

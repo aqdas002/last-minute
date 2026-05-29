@@ -28,3 +28,10 @@ export const listingById = (id: string) => api<Listing>(`/api/listings/${id}`)
 export const byCategory = (slug: string) =>
   api<Listing[]>(`/api/categories/${slug}/listings`)
 export const allCategories = () => api<Category[]>('/api/categories')
+
+export const searchListings = (q: string, city?: string, category?: string) => {
+  const params = new URLSearchParams({ q })
+  if (city) params.set('city', city)
+  if (category) params.set('category', category)
+  return api<Listing[]>(`/api/listings/search?${params.toString()}`)
+}

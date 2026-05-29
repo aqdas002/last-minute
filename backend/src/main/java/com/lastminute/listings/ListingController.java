@@ -28,4 +28,14 @@ public class ListingController {
   public ResponseEntity<ListingDto> byId(@PathVariable UUID id) {
     return q.byId(id).map(ListingDto::from).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
   }
+
+  @GetMapping("/search")
+  public List<ListingDto> search(
+      @RequestParam String q,
+      @RequestParam(required = false) String city,
+      @RequestParam(required = false) String category) {
+    String trimmed = q == null ? "" : q.trim();
+    if (trimmed.length() < 2) return List.of();
+    return this.q.search(trimmed, city, category).stream().map(ListingDto::from).toList();
+  }
 }

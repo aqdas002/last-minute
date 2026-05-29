@@ -37,7 +37,7 @@ public class PendingBookingSweeper {
   /** Synchronous variant for tests. Returns the number of bookings cancelled. */
   public int sweepNow() {
     Instant now = Instant.now(clock);
-    var expired = bookings.findExpiredPending(now);
+    var expired = bookings.findExpiredPending(now, BookingStatus.pending);
     int cancelled = 0;
     for (Booking b : expired) {
       try {

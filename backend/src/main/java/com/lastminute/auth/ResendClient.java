@@ -55,6 +55,38 @@ public class ResendClient {
         .toBodilessEntity();
   }
 
+  /** Spec §5 Flow 1 step 9: T-1h booking reminder. */
+  public void sendBookingReminder(
+      String to, String listingTitle, String startTimeFormatted, String redemptionCode) {
+    if (apiKey == null || apiKey.isBlank()) {
+      LOG.warn(
+          "[dev] would email {} -> reminder for '{}' at {} (code {})",
+          to,
+          listingTitle,
+          startTimeFormatted,
+          redemptionCode);
+      return;
+    }
+    http
+        .post()
+        .uri("/emails")
+        .header("Authorization", "Bearer " + apiKey)
+        .body(
+            Map.of(
+                "from", from,
+                "to", to,
+                "subject", "Reminder: " + listingTitle + " starts soon",
+                "html",
+                    "<p>Heads up — your booking starts at "
+                        + startTimeFormatted
+                        + ".</p>"
+                        + "<p>Show this code at the door: <strong>"
+                        + redemptionCode
+                        + "</strong></p>"))
+        .retrieve()
+        .toBodilessEntity();
+  }
+
   /** Spec §5 Flow 2 step 6: notify the provider once Stripe Connect KYC clears. */
   public void sendProviderLive(String to) {
     if (apiKey == null || apiKey.isBlank()) {
