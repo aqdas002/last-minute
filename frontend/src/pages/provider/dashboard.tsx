@@ -47,6 +47,12 @@ export function ProviderDashboardPage() {
         >
           Today's bookings
         </Link>
+        <Link
+          to="/provider/bookings/all"
+          className="rounded border border-zinc-300 px-4 py-2 text-sm text-zinc-700"
+        >
+          All bookings
+        </Link>
         {!isLive && (
           <Link
             to="/provider/onboarding"
