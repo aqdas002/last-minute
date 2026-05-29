@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   myListings,
@@ -99,16 +99,13 @@ function CreateListingForm({
   categories: { id: string; slug: string; name: string }[]
   onCreated: () => void
 }) {
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryIdState, setCategoryId] = useState<string | null>(null)
+  const categoryId = categoryIdState ?? categories[0]?.id ?? ''
   const [title, setTitle] = useState('')
   const [originalPriceCents, setOriginal] = useState(12000)
   const [discountedPriceCents, setDiscounted] = useState(8000)
   const [capacity, setCapacity] = useState(8)
   const [startHoursFromNow, setStartHours] = useState(2)
-
-  useEffect(() => {
-    if (categories.length > 0 && !categoryId) setCategoryId(categories[0]!.id)
-  }, [categories, categoryId])
 
   const { data: fee } = useQuery({
     queryKey: ['preview-fee', discountedPriceCents],
