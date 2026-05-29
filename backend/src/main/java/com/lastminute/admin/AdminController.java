@@ -63,7 +63,7 @@ public class AdminController {
   public record CreateCategoryRequest(@NotBlank String slug, @NotBlank String name) {}
 
   @PostMapping("/categories")
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   public ResponseEntity<UUID> createCategory(@Valid @RequestBody CreateCategoryRequest body) {
     Category c = new Category();
     c.setSlug(body.slug());
@@ -111,7 +111,7 @@ public class AdminController {
       @Positive double startHoursFromNow) {}
 
   @PostMapping("/listings")
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   @Transactional
   public ResponseEntity<ListingDto> createListing(@Valid @RequestBody CreateListingRequest body) {
     if (body.discountedPriceCents() >= body.originalPriceCents()) {

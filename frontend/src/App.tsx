@@ -1,6 +1,9 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ErrorBoundary } from './components/error-boundary'
+import { Footer } from './components/footer'
 import { Header } from './components/header'
+import { NotFoundPage } from './pages/not-found'
 import { HomePage } from './pages/home'
 import { CategoryPage } from './pages/category'
 import { ListingPage } from './pages/listing'
@@ -27,7 +30,8 @@ export default function App() {
       <BrowserRouter>
         <Header />
         <main className="mx-auto max-w-5xl px-4 py-6">
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/c/:slug" element={<CategoryPage />} />
             <Route path="/l/:id" element={<ListingPage />} />
@@ -46,9 +50,11 @@ export default function App() {
             <Route path="/provider/bookings/today" element={<ProviderBookingsTodayPage />} />
             <Route path="/provider/bookings/all" element={<ProviderBookingsAllPage />} />
             <Route path="/admin/refunds" element={<AdminRefundsPage />} />
-            <Route path="*" element={<p>Not found.</p>} />
-          </Routes>
+            <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
+        <Footer />
       </BrowserRouter>
     </QueryClientProvider>
   )

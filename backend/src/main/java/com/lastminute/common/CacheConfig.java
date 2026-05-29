@@ -19,7 +19,8 @@ public class CacheConfig {
 
   @Bean
   public CacheManager cacheManager() {
-    CaffeineCacheManager mgr = new CaffeineCacheManager("listings-by-category", "starting-soon");
+    CaffeineCacheManager mgr =
+        new CaffeineCacheManager("listings-by-category", "starting-soon", "listing-by-id");
     mgr.setCaffeine(Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(15)).maximumSize(1_000));
     return mgr;
   }

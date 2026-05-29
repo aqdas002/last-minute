@@ -95,7 +95,7 @@ public class ProviderListingService {
   }
 
   @Transactional
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   public Listing edit(UUID providerId, UUID listingId, EditRequest req) {
     Listing l = findOwn(providerId, listingId);
     // Eager-touch for DTO serialization outside the tx.
@@ -124,7 +124,7 @@ public class ProviderListingService {
   }
 
   @Transactional
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   public Listing publish(UUID providerId, UUID listingId) {
     Listing l = findOwn(providerId, listingId);
     Provider p = l.getProvider();
@@ -146,7 +146,7 @@ public class ProviderListingService {
    * still has to honor them. Suspend just stops *new* bookings.
    */
   @Transactional
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   public Listing suspend(UUID providerId, UUID listingId) {
     Listing l = findOwn(providerId, listingId);
     l.getCategory().getSlug();
@@ -160,7 +160,7 @@ public class ProviderListingService {
 
   /** Reverse of {@link #suspend} — bring a suspended listing back into the browse feed. */
   @Transactional
-  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon"}, allEntries = true)
+  @CacheEvict(cacheNames = {"listings-by-category", "starting-soon", "listing-by-id"}, allEntries = true)
   public Listing unsuspend(UUID providerId, UUID listingId) {
     Listing l = findOwn(providerId, listingId);
     l.getCategory().getSlug();

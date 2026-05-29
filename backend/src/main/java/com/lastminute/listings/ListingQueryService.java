@@ -34,6 +34,7 @@ public class ListingQueryService {
     return repo.findActiveByCategorySlug(Instant.now(clock), slug, ListingStatus.active);
   }
 
+  @Cacheable(cacheNames = "listing-by-id", key = "#id")
   public Optional<Listing> byId(UUID id) {
     return repo.findActiveById(Instant.now(clock), id, ListingStatus.active);
   }
