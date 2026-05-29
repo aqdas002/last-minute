@@ -35,7 +35,11 @@ jobs:
           node-version: '22.11.0'
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      # NOTE: not --frozen-lockfile — vite 8 pulls rolldown which has a
+      # linux-x64 native binding that isn't in the lockfile because we
+      # generate the lockfile on WSL/macOS. Drop frozen so CI can install
+      # the missing platform binary; revisit when we have a Linux dev env.
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm tsc -b --noEmit
       - run: pnpm lint
       - run: pnpm build
