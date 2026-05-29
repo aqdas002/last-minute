@@ -126,4 +126,34 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
       ORDER BY b.createdAt DESC
       """)
   List<Booking> findRecentByProvider(@Param("providerId") UUID providerId);
+
+  /**
+   * Provider 30d revenue summary. Sums {@code provider_payout_cents} across bookings that earned
+   * the provider money — confirmed + completed — for the trailing window. Cancelled bookings
+   * (whether by refund or chargeback) are excluded.
+   */
+  @Query(
+      """
+      SELECT COALESCE(SUM(b.providerPayoutCents), 0)
+      FROM Booking b
+      WHERE b.provider.id = :providerId
+        AND b.status IN :earningStatuses
+        AND b.createdAt >= :since
+      """)
+  long sumEarnedSince(
+      @Param("providerId") UUID providerId,
+      @Param("earningStatuses") List<BookingStatus> earningStatuses,
+      @Param("since") Instant since);
+
+  @Query(
+      """
+      SELECT COUNT(b) FROM Booking b
+      WHERE b.provider.id = :providerId
+        AND b.status IN :statuses
+        AND b.createdAt >= :since
+      """)
+  long countByProviderAndStatusesSince(
+      @Param("providerId") UUID providerId,
+      @Param("statuses") List<BookingStatus> statuses,
+      @Param("since") Instant since);
 }

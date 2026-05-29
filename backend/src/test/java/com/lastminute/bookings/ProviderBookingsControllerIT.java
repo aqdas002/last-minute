@@ -123,6 +123,26 @@ class ProviderBookingsControllerIT extends IntegrationTestBase {
   }
 
   @Test
+  void summary_aggregates_payout_for_earning_bookings_only() throws Exception {
+    // 2 earning (one confirmed, one completed) + 1 cancelled — only earning counts
+    Booking earning1 = seedConfirmedBookingStartingTodayPlusHours(2, "SUMA1234");
+    Booking earning2 = seedConfirmedBookingStartingTodayPlusHours(3, "SUMB1234");
+    earning2.setStatus(BookingStatus.completed);
+    bookings.save(earning2);
+    Booking cancelled = seedConfirmedBookingStartingTodayPlusHours(4, "SUMC1234");
+    cancelled.setStatus(BookingStatus.cancelled);
+    bookings.save(cancelled);
+
+    mvc.perform(get("/api/providers/me/bookings/summary").with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.payoutCents").value(earning1.getProviderPayoutCents() + earning2.getProviderPayoutCents()))
+        .andExpect(jsonPath("$.currency").value("USD"))
+        .andExpect(jsonPath("$.bookingsCount").value(2))
+        .andExpect(jsonPath("$.cancelledCount").value(1))
+        .andExpect(jsonPath("$.windowDays").value(30));
+  }
+
+  @Test
   void today_returns_confirmed_bookings_starting_today() throws Exception {
     seedConfirmedBookingStartingTodayPlusHours(2, "TODAY123");
 

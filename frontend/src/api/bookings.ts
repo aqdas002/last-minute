@@ -47,6 +47,17 @@ export const providerTodayBookings = () =>
 export const providerAllBookings = () =>
   api<ProviderBooking[]>('/api/providers/me/bookings/all')
 
+export type RevenueSummary = {
+  payoutCents: number
+  currency: string
+  bookingsCount: number
+  cancelledCount: number
+  windowDays: number
+}
+
+export const providerRevenueSummary = () =>
+  api<RevenueSummary>('/api/providers/me/bookings/summary')
+
 export type RedemptionResult = {
   code: 'OK' | 'ALREADY_REDEEMED' | 'CODE_NOT_VALID'
   bookingId: string | null

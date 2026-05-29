@@ -1,6 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { onboardingState, myListings } from '../../api/providers'
+import { providerRevenueSummary } from '../../api/bookings'
+
+function money(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100)
+}
 
 export function ProviderDashboardPage() {
   const { data: state } = useQuery({
@@ -10,6 +15,10 @@ export function ProviderDashboardPage() {
   const { data: listings } = useQuery({
     queryKey: ['my-listings'],
     queryFn: () => myListings(),
+  })
+  const { data: summary } = useQuery({
+    queryKey: ['provider-summary'],
+    queryFn: providerRevenueSummary,
   })
 
   const isLive = state?.chargesEnabled && state?.payoutsEnabled
@@ -47,6 +56,30 @@ export function ProviderDashboardPage() {
           </Link>
         )}
       </section>
+
+      {summary && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold uppercase text-zinc-500">
+            Last {summary.windowDays} days
+          </h2>
+          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <div className="rounded border border-zinc-200 p-3">
+              <dt className="text-zinc-500">Earned</dt>
+              <dd className="mt-1 text-lg font-semibold">
+                {money(summary.payoutCents, summary.currency)}
+              </dd>
+            </div>
+            <div className="rounded border border-zinc-200 p-3">
+              <dt className="text-zinc-500">Bookings</dt>
+              <dd className="mt-1 text-lg font-semibold">{summary.bookingsCount}</dd>
+            </div>
+            <div className="rounded border border-zinc-200 p-3">
+              <dt className="text-zinc-500">Cancelled</dt>
+              <dd className="mt-1 text-lg font-semibold">{summary.cancelledCount}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase text-zinc-500">Status</h2>

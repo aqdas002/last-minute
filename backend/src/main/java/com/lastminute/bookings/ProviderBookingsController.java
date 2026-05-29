@@ -74,6 +74,27 @@ public class ProviderBookingsController {
         .toList();
   }
 
+  /** 30-day revenue summary for the dashboard. Counts + sum payout in minor units. */
+  @GetMapping("/summary")
+  @Transactional(readOnly = true)
+  public RevenueSummary summary(@AuthenticationPrincipal CurrentUser principal) {
+    Provider p =
+        providers
+            .findById(principal.id())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no_provider"));
+    Instant since = Instant.now(clock).minus(java.time.Duration.ofDays(30));
+    var earning = List.of(BookingStatus.confirmed, BookingStatus.completed);
+    long payout = bookings.sumEarnedSince(principal.id(), earning, since);
+    long earningCount = bookings.countByProviderAndStatusesSince(principal.id(), earning, since);
+    long cancelledCount =
+        bookings.countByProviderAndStatusesSince(
+            principal.id(), List.of(BookingStatus.cancelled), since);
+    return new RevenueSummary(payout, p.getCurrency(), earningCount, cancelledCount, 30);
+  }
+
+  public record RevenueSummary(
+      long payoutCents, String currency, long bookingsCount, long cancelledCount, int windowDays) {}
+
   @PostMapping("/redeem")
   @Transactional
   public ResponseEntity<RedemptionResult> redeem(
