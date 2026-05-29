@@ -26,3 +26,8 @@ Thumbs.db
 
 # Testcontainers / Docker artifacts
 .testcontainers/
+
+# Agentic-tooling operational state (kept out of the public repo)
+.claude/
+.brainstorm-draft/
+.superpowers/
