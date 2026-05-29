@@ -12,6 +12,7 @@ import { ProviderDashboardPage } from './pages/provider/dashboard'
 import { ProviderListingsPage } from './pages/provider/listings'
 import { ProviderBookingsTodayPage } from './pages/provider/bookings-today'
 import { ProviderBookingsAllPage } from './pages/provider/bookings-all'
+import { AdminRefundsPage } from './pages/admin/refunds'
 import { BookingSuccessPage } from './pages/booking-success'
 import { MyBookingsPage } from './pages/my-bookings'
 
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/provider/listings" element={<ProviderListingsPage />} />
             <Route path="/provider/bookings/today" element={<ProviderBookingsTodayPage />} />
             <Route path="/provider/bookings/all" element={<ProviderBookingsAllPage />} />
+            <Route path="/admin/refunds" element={<AdminRefundsPage />} />
             <Route path="*" element={<p>Not found.</p>} />
           </Routes>
         </main>
