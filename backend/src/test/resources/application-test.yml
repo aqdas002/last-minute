@@ -1,0 +1,16 @@
+spring:
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+sentry:
+  enabled: false
+
+app:
+  resend:
+    api-key: ""
+  base-url: "http://localhost:8080"
+  frontend-origin: "http://localhost:5173"
+  commission-percent: 15
