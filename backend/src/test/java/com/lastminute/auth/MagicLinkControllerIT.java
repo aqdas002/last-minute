@@ -1,16 +1,24 @@
 package com.lastminute.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lastminute.support.IntegrationTestBase;
 import com.lastminute.users.UserRepository;
+import com.lastminute.users.UserRole;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -76,5 +84,39 @@ class MagicLinkControllerIT extends IntegrationTestBase {
     mvc.perform(get("/api/auth/magic").param("token", token).param("return_to", "https://evil.com"))
         .andExpect(status().isFound())
         .andExpect(header().string("Location", "http://localhost:5173/"));
+  }
+
+  @Test
+  void me_returns_204_when_unauthenticated() throws Exception {
+    mvc.perform(get("/api/auth/me")).andExpect(status().isNoContent());
+  }
+
+  @Test
+  void me_returns_principal_when_authenticated() throws Exception {
+    CurrentUser cu =
+        new CurrentUser(UUID.randomUUID(), "alice@example.com", UserRole.consumer);
+    Authentication a =
+        new UsernamePasswordAuthenticationToken(
+            cu, null, List.of(new SimpleGrantedAuthority("ROLE_CONSUMER")));
+
+    mvc.perform(get("/api/auth/me").with(authentication(a)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.email").value("alice@example.com"))
+        .andExpect(jsonPath("$.role").value("consumer"));
+  }
+
+  @Test
+  void signout_returns_204_and_subsequent_me_is_204() throws Exception {
+    CurrentUser cu =
+        new CurrentUser(UUID.randomUUID(), "bob@example.com", UserRole.consumer);
+    Authentication a =
+        new UsernamePasswordAuthenticationToken(
+            cu, null, List.of(new SimpleGrantedAuthority("ROLE_CONSUMER")));
+
+    mvc.perform(post("/api/auth/signout").with(authentication(a)))
+        .andExpect(status().isNoContent());
+
+    // No session => /me is anonymous
+    mvc.perform(get("/api/auth/me")).andExpect(status().isNoContent());
   }
 }

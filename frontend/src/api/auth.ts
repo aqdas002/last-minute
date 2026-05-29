@@ -6,5 +6,14 @@ export const requestMagicLink = (email: string, returnTo?: string) =>
     body: JSON.stringify({ email, returnTo: returnTo ?? '/' }),
   })
 
-export type Me = { id: string; email: string; role: 'consumer' | 'provider' | 'admin' }
-export const me = () => api<Me>('/api/me')
+export type WhoAmI = { id: string; email: string; role: 'consumer' | 'provider' | 'admin' }
+
+export const whoami = async (): Promise<WhoAmI | null> => {
+  const res = await fetch('/api/auth/me', { credentials: 'include' })
+  if (res.status === 204) return null
+  if (!res.ok) throw new Error(`whoami_${res.status}`)
+  return res.json()
+}
+
+export const signOut = () =>
+  api<void>('/api/auth/signout', { method: 'POST' })

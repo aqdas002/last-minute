@@ -18,6 +18,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -100,4 +101,22 @@ public class MagicLinkController {
           .build();
     }
   }
+
+  /** Frontend whoami — returns the current session principal or 204 (no body) when unauthenticated. */
+  @GetMapping("/me")
+  public ResponseEntity<WhoAmI> me(@AuthenticationPrincipal CurrentUser principal) {
+    if (principal == null) return ResponseEntity.noContent().build();
+    return ResponseEntity.ok(new WhoAmI(principal.id().toString(), principal.email(), principal.role().name()));
+  }
+
+  /** Frontend sign-out — invalidates the session so subsequent calls are anonymous. */
+  @PostMapping("/signout")
+  public ResponseEntity<Void> signout(HttpServletRequest req) {
+    var session = req.getSession(false);
+    if (session != null) session.invalidate();
+    SecurityContextHolder.clearContext();
+    return ResponseEntity.noContent().build();
+  }
+
+  public record WhoAmI(String id, String email, String role) {}
 }
