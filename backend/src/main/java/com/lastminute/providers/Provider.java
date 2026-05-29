@@ -13,8 +13,10 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 import org.hibernate.type.SqlTypes;
 
 @Entity
@@ -70,7 +72,7 @@ public class Provider {
   @Column private String country;
 
   @Enumerated(EnumType.STRING)
-  @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+  @JdbcType(PostgreSQLEnumJdbcType.class)
   @Column(nullable = false, columnDefinition = "provider_status")
   private ProviderStatus status = ProviderStatus.pending_kyc;
 

@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 import org.hibernate.type.SqlTypes;
 
 @Entity
@@ -83,7 +85,7 @@ public class Listing {
   @Column private String city;
 
   @Enumerated(EnumType.STRING)
-  @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+  @JdbcType(PostgreSQLEnumJdbcType.class)
   @Column(nullable = false, columnDefinition = "listing_status")
   private ListingStatus status = ListingStatus.draft;
 

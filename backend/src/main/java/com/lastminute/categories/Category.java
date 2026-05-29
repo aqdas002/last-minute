@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.ColumnTransformer;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -47,6 +48,7 @@ public class Category {
    * hours"}.
    */
   @Column(name = "no_show_grace_interval", nullable = false, columnDefinition = "interval")
+  @ColumnTransformer(write = "?::interval", read = "no_show_grace_interval::text")
   private String noShowGraceInterval = "2 hours";
 
   @CreationTimestamp
