@@ -10,6 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface ListingRepository extends JpaRepository<Listing, UUID> {
 
+  List<Listing> findAllByProviderIdOrderByStartTimeAsc(UUID providerId);
+
+
   /**
    * Consumer-facing "starting soon" feed. Strict {@code listing_expires_at > now} (belt-and-braces
    * per spec §2 caching). Optional city filter. {@code JOIN FETCH} eagerly loads category +
