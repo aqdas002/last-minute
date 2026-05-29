@@ -24,8 +24,14 @@ public class SecurityConfig {
         // address; anyone can ask for a magic link). When we add price-sensitive Server Actions
         // in M3, re-introduce CSRF for those routes specifically via a CookieCsrfTokenRepository.
         // M1: admin endpoints are role-gated; M3 will introduce CSRF for consumer state-changing
-        // endpoints. /api/auth and /api/webhooks are by design CSRF-free.
-        .csrf(c -> c.ignoringRequestMatchers("/api/auth/**", "/api/webhooks/**", "/api/admin/**"))
+        // endpoints. /api/auth, /api/webhooks, /api/admin, /api/providers are by design CSRF-free.
+        .csrf(
+            c ->
+                c.ignoringRequestMatchers(
+                    "/api/auth/**",
+                    "/api/webhooks/**",
+                    "/api/admin/**",
+                    "/api/providers/**"))
         .cors(Customizer.withDefaults())
         .authorizeHttpRequests(
             a ->
@@ -33,11 +39,15 @@ public class SecurityConfig {
                         "/api/auth/**",
                         "/api/listings/**",
                         "/api/categories/**",
+                        "/api/providers/signup",
+                        "/api/webhooks/**",
                         "/actuator/health",
                         "/actuator/info")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
                     .hasAuthority("ROLE_ADMIN")
+                    .requestMatchers("/api/providers/me/**", "/api/providers/onboarding/**")
+                    .hasAuthority("ROLE_PROVIDER")
                     .anyRequest()
                     .authenticated())
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))

@@ -122,6 +122,13 @@
 			<version>4.0.0</version>
 		</dependency>
 
+		<!-- Stripe Connect (Express accounts, payments, webhooks) -->
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>29.2.0</version>
+		</dependency>
+
 		<!-- Test extras -->
 		<dependency>
 			<groupId>org.wiremock</groupId>

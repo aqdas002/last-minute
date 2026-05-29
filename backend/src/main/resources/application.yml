@@ -31,6 +31,9 @@ app:
   resend:
     api-key: ${RESEND_API_KEY:}
     from: ${EMAIL_FROM:dev@local}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
   commission-percent: 15
 
 sentry:
