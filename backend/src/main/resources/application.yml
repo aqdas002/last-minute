@@ -36,8 +36,30 @@ app:
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
   commission-percent: 15
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized        # public probe sees UP/DOWN; admins see db/diskSpace
+      probes:
+        enabled: true                      # /actuator/health/liveness + /readiness for k8s/Fly
+  info:
+    git:
+      mode: simple
+
+info:
+  app:
+    name: ${spring.application.name}
+    commission-percent: ${app.commission-percent}
+
+# Sentry auto-starts only when SENTRY_DSN is non-empty (the starter checks
+# at boot). Don't set sentry.enabled here — that would force-disable even
+# when ops provides a DSN.
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: ${SENTRY_ENVIRONMENT:development}
   traces-sample-rate: 0.1
-  enabled: false                          # explicit; flip to true when DSN is set in prod
+  release: ${SENTRY_RELEASE:#{null}}
