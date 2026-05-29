@@ -31,7 +31,8 @@ public class SecurityConfig {
                     "/api/auth/**",
                     "/api/webhooks/**",
                     "/api/admin/**",
-                    "/api/providers/**"))
+                    "/api/providers/**",
+                    "/api/bookings/**"))
         .cors(Customizer.withDefaults())
         .authorizeHttpRequests(
             a ->

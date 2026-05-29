@@ -23,6 +23,7 @@ public class DbTruncate {
     em.createNativeQuery(
             """
             TRUNCATE TABLE
+              bookings,
               webhook_dead_letter,
               payment_events,
               admin_actions,

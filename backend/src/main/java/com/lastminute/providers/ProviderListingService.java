@@ -1,5 +1,7 @@
 package com.lastminute.providers;
 
+import com.lastminute.bookings.BookingRepository;
+import com.lastminute.bookings.BookingStatus;
 import com.lastminute.categories.Category;
 import com.lastminute.categories.CategoryRepository;
 import com.lastminute.listings.Listing;
@@ -26,16 +28,19 @@ public class ProviderListingService {
   private final ListingRepository listings;
   private final ProviderRepository providers;
   private final CategoryRepository categories;
+  private final BookingRepository bookings;
   private final Clock clock;
 
   public ProviderListingService(
       ListingRepository listings,
       ProviderRepository providers,
       CategoryRepository categories,
+      BookingRepository bookings,
       Clock clock) {
     this.listings = listings;
     this.providers = providers;
     this.categories = categories;
+    this.bookings = bookings;
     this.clock = clock;
   }
 
@@ -143,12 +148,10 @@ public class ProviderListingService {
     return l;
   }
 
-  /**
-   * M2: bookings table doesn't exist yet, so always 0. M3 replaces this with a real query against
-   * the bookings table filtered by {@code status IN ('pending','confirmed')}.
-   */
+  /** M3: real predicate against the bookings table. */
   private boolean hasActiveBookings(UUID listingId) {
-    return false;
+    return bookings.existsByListing_IdAndStatusIn(
+        listingId, List.of(BookingStatus.pending, BookingStatus.confirmed));
   }
 
   private void validateRequest(CreateRequest req) {

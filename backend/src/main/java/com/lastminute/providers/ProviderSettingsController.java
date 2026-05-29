@@ -1,7 +1,7 @@
 package com.lastminute.providers;
 
 import com.lastminute.auth.CurrentUser;
-import com.lastminute.listings.ListingRepository;
+import com.lastminute.bookings.BookingRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,18 +21,17 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProviderSettingsController {
 
   private final ProviderRepository providers;
-  private final ListingRepository listings;
+  private final BookingRepository bookings;
 
-  public ProviderSettingsController(ProviderRepository providers, ListingRepository listings) {
+  public ProviderSettingsController(ProviderRepository providers, BookingRepository bookings) {
     this.providers = providers;
-    this.listings = listings;
+    this.bookings = bookings;
   }
 
   /**
-   * Self-correct only IFF no listings exist yet (proxy for "no bookings yet" — bookings table
-   * doesn't arrive until M3, but any listing implies a possible booking path so we block once
-   * listings exist). Admin override (POST /api/admin/providers/{id}/currency) covers the
-   * after-the-fact case.
+   * Spec §5 Flow 2 step 9: self-correct only IFF no bookings exist for this provider. Admin
+   * override at POST /api/admin/providers/{id}/currency covers the after-the-fact case with a
+   * required reason logged to admin_actions.
    */
   @PatchMapping("/currency")
   @Transactional
@@ -40,9 +39,9 @@ public class ProviderSettingsController {
       @AuthenticationPrincipal CurrentUser principal, @Valid @RequestBody ChangeCurrencyBody body) {
     UUID providerId = principal.id();
 
-    if (!listings.findAllByProviderIdOrderByStartTimeAsc(providerId).isEmpty()) {
+    if (bookings.existsByProvider_Id(providerId)) {
       throw new ResponseStatusException(
-          HttpStatus.CONFLICT, "listings_exist_use_admin_override");
+          HttpStatus.CONFLICT, "bookings_exist_use_admin_override");
     }
 
     Provider p =

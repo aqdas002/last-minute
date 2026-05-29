@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lastminute.admin.AdminActionRepository;
 import com.lastminute.auth.CurrentUser;
+import com.lastminute.bookings.Booking;
+import com.lastminute.bookings.BookingRepository;
+import com.lastminute.bookings.BookingStatus;
 import com.lastminute.categories.Category;
 import com.lastminute.categories.CategoryRepository;
 import com.lastminute.listings.Listing;
@@ -24,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.lastminute.users.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +48,7 @@ class CurrencyToolsIT extends IntegrationTestBase {
   @Autowired private ProviderRepository providers;
   @Autowired private CategoryRepository categories;
   @Autowired private ListingRepository listings;
+  @Autowired private BookingRepository bookings;
   @Autowired private AdminActionRepository audit;
 
   private CurrentUser providerPrincipal;
@@ -131,8 +136,25 @@ class CurrencyToolsIT extends IntegrationTestBase {
   }
 
   @Test
-  void self_correct_rejected_once_a_listing_exists() throws Exception {
-    seedListing();
+  void self_correct_rejected_once_a_booking_exists() throws Exception {
+    // M3 tightened the predicate: it's now "any booking" not "any listing".
+    Listing l = seedListing();
+    User consumer = new User();
+    consumer.setEmail("c-" + UUID.randomUUID() + "@x");
+    consumer.setRole(UserRole.consumer);
+    consumer = users.save(consumer);
+    Booking b = new Booking();
+    b.setListing(l);
+    b.setProvider(providers.findById(providerPrincipal.id()).orElseThrow());
+    b.setConsumer(consumer);
+    b.setStatus(BookingStatus.pending);
+    b.setAmountPaidCents(8000);
+    b.setPlatformFeeCents(1200);
+    b.setProviderPayoutCents(6800);
+    b.setCurrency("USD");
+    b.setPendingExpiresAt(Instant.now().plusSeconds(2100));
+    b.setRedemptionCode("ABCD2345");
+    bookings.save(b);
 
     mvc.perform(
             patch("/api/providers/me/settings/currency")
@@ -140,6 +162,18 @@ class CurrencyToolsIT extends IntegrationTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("currency", "EUR"))))
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  void self_correct_allowed_when_only_listings_exist_no_bookings() throws Exception {
+    // M2 blocked here; M3 (which tightened predicate to bookings) now allows.
+    seedListing();
+    mvc.perform(
+            patch("/api/providers/me/settings/currency")
+                .with(asProvider())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("currency", "EUR"))))
+        .andExpect(status().isNoContent());
   }
 
   @Test
