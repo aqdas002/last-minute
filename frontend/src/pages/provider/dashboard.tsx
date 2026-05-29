@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { onboardingState, myListings } from '../../api/providers'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { createDashboardLink, onboardingState, myListings } from '../../api/providers'
 import { providerRevenueSummary } from '../../api/bookings'
 
 function money(cents: number, currency: string): string {
@@ -22,6 +22,11 @@ export function ProviderDashboardPage() {
   })
 
   const isLive = state?.chargesEnabled && state?.payoutsEnabled
+
+  const dashboardMut = useMutation({
+    mutationFn: createDashboardLink,
+    onSuccess: (r) => window.location.assign(r.url),
+  })
 
   return (
     <div className="space-y-6">
@@ -60,6 +65,16 @@ export function ProviderDashboardPage() {
           >
             Finish Stripe verification
           </Link>
+        )}
+        {isLive && (
+          <button
+            type="button"
+            disabled={dashboardMut.isPending}
+            onClick={() => dashboardMut.mutate()}
+            className="rounded border border-zinc-300 px-4 py-2 text-sm disabled:opacity-50"
+          >
+            {dashboardMut.isPending ? 'Opening Stripe…' : 'View payouts on Stripe'}
+          </button>
         )}
       </section>
 

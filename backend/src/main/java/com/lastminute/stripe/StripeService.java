@@ -57,6 +57,15 @@ public class StripeService {
   }
 
   /**
+   * Stripe Connect Express login link — single-use URL that signs the provider into the
+   * Express dashboard where they see balances, payouts, tax docs. Different from
+   * {@link #createAccountOnboardingLink}: this is the post-onboarding self-service portal.
+   */
+  public String createExpressDashboardLink(String accountId) throws StripeException {
+    return com.stripe.model.LoginLink.createOnAccount(accountId, java.util.Map.of(), null).getUrl();
+  }
+
+  /**
    * Spec §5 Flow 1 step 4: create a Stripe Checkout Session for a pending booking. {@code
    * expires_at = now + 30 min} matches Stripe's documented minimum; our {@code
    * pending_expires_at} is 35 min so the session expires first. Idempotency key = booking id.

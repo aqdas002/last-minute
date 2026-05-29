@@ -5,6 +5,8 @@ import com.lastminute.stripe.StripeService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Account;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,6 +91,27 @@ public class OnboardingController {
             provider.isStripeChargesEnabled(),
             provider.isStripePayoutsEnabled(),
             provider.getStatus().name()));
+  }
+
+  /**
+   * Stripe Connect Express dashboard link — providers click through to see balances, payouts,
+   * and tax docs in Stripe's hosted UI. Single-use URL so we mint a fresh one per click.
+   */
+  @PostMapping("/dashboard-link")
+  public ResponseEntity<LinkResponse> dashboardLink(@AuthenticationPrincipal CurrentUser principal)
+      throws StripeException {
+    Provider provider =
+        providers
+            .findById(principal.id())
+            .orElseThrow(() -> new IllegalStateException("no provider row"));
+    if (provider.getStripeAccountId() == null) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "NOT_ONBOARDED");
+    }
+    if (!provider.isStripeChargesEnabled()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "ONBOARDING_INCOMPLETE");
+    }
+    return ResponseEntity.ok(
+        new LinkResponse(stripe.createExpressDashboardLink(provider.getStripeAccountId())));
   }
 
   public record LinkResponse(String url) {}

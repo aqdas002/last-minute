@@ -129,6 +129,39 @@ class OnboardingControllerIT extends IntegrationTestBase {
   }
 
   @Test
+  void dashboard_link_returns_stripe_login_url() throws Exception {
+    Provider p = providers.findById(principal.id()).orElseThrow();
+    p.setStripeAccountId("acct_DASH");
+    p.setStripeChargesEnabled(true);
+    providers.save(p);
+
+    when(stripe.createExpressDashboardLink("acct_DASH"))
+        .thenReturn("https://connect.stripe.com/express/acct_DASH/login");
+
+    mvc.perform(post("/api/providers/onboarding/dashboard-link").with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.url").value("https://connect.stripe.com/express/acct_DASH/login"));
+  }
+
+  @Test
+  void dashboard_link_409_when_no_stripe_account() throws Exception {
+    // Default seed has no stripe_account_id and charges disabled
+    mvc.perform(post("/api/providers/onboarding/dashboard-link").with(asProvider()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void dashboard_link_409_when_onboarding_incomplete() throws Exception {
+    Provider p = providers.findById(principal.id()).orElseThrow();
+    p.setStripeAccountId("acct_PENDING");
+    p.setStripeChargesEnabled(false);
+    providers.save(p);
+
+    mvc.perform(post("/api/providers/onboarding/dashboard-link").with(asProvider()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
   void onboarding_state_requires_authenticated_user() throws Exception {
     // Spring Security returns 403 (not 401) for both "no auth" and "wrong role"
     // when the rule is hasAuthority(...). M3 can revisit if we want stricter 401-vs-403 semantics.

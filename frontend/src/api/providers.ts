@@ -39,6 +39,9 @@ export const signupProvider = (body: SignupBody) =>
 export const createOnboardingLink = () =>
   api<{ url: string }>('/api/providers/onboarding/link', { method: 'POST' })
 
+export const createDashboardLink = () =>
+  api<{ url: string }>('/api/providers/onboarding/dashboard-link', { method: 'POST' })
+
 export const onboardingState = () =>
   api<OnboardingState>('/api/providers/onboarding/state')
 
