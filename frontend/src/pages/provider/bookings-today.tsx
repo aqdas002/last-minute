@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  providerMarkNoShow,
   providerTodayBookings,
   redeemCode,
   type ProviderBooking,
@@ -17,14 +18,23 @@ function timeOnly(iso: string): string {
 
 export function ProviderBookingsTodayPage() {
   const qc = useQueryClient()
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, dataUpdatedAt } = useQuery({
     queryKey: ['provider-today'],
     queryFn: providerTodayBookings,
     refetchInterval: 30_000,
   })
+  // TanStack Query's dataUpdatedAt is a stable timestamp (ms epoch) from the
+  // last fetch — using it as our "now" reference is pure (no Date.now in render)
+  // and refreshes on each 30s refetch.
+  const nowSnapshot = dataUpdatedAt || 0
 
   const [code, setCode] = useState('')
   const [feedback, setFeedback] = useState<RedemptionResult | { code: 'ERROR'; message: string } | null>(null)
+
+  const noShowMut = useMutation({
+    mutationFn: (id: string) => providerMarkNoShow(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['provider-today'] }),
+  })
 
   const m = useMutation({
     mutationFn: (c: string) => redeemCode(c),
@@ -114,24 +124,39 @@ export function ProviderBookingsTodayPage() {
         )}
         {data && data.length > 0 && (
           <ul className="mt-3 divide-y divide-zinc-200 rounded border border-zinc-200">
-            {data.map((b: ProviderBooking) => (
-              <li key={b.id} className="flex items-center justify-between px-3 py-3">
-                <div>
-                  <p className="font-medium">{b.listingTitle}</p>
-                  <p className="text-xs text-zinc-600">
-                    {timeOnly(b.startTime)} · {b.consumerEmail}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm tracking-widest text-zinc-700">
-                    {b.redemptionCode}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {money(b.providerPayoutCents, b.currency)} payout
-                  </span>
-                </div>
-              </li>
-            ))}
+            {data.map((b: ProviderBooking) => {
+              const startPassed = new Date(b.startTime).getTime() < nowSnapshot
+              return (
+                <li key={b.id} className="flex items-center justify-between gap-3 px-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{b.listingTitle}</p>
+                    <p className="text-xs text-zinc-600">
+                      {timeOnly(b.startTime)} · {b.consumerEmail}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-mono text-sm tracking-widest text-zinc-700">
+                      {b.redemptionCode}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      {money(b.providerPayoutCents, b.currency)}
+                    </span>
+                    {startPassed && (
+                      <button
+                        type="button"
+                        disabled={noShowMut.isPending}
+                        onClick={() => {
+                          if (confirm(`Mark "${b.listingTitle}" as no-show?`)) noShowMut.mutate(b.id)
+                        }}
+                        className="rounded border border-red-300 px-2 py-1 text-xs text-red-700"
+                      >
+                        No-show
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

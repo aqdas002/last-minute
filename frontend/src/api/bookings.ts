@@ -6,12 +6,20 @@ export type Booking = {
   id: string
   listingId: string
   listingTitle: string
+  listingAddress: string | null
+  listingCity: string | null
+  listingEndTime: string
+  listingTimezone: string
+  providerName: string
   status: BookingStatus
+  cancellationReason: string | null
   amountPaidCents: number
   currency: string
   startTime: string
   pendingExpiresAt: string
   confirmedAt: string | null
+  cancelledAt: string | null
+  redeemedAt: string | null
   redemptionCode: string | null
   checkoutUrlIfAny: string | null
 }
@@ -70,6 +78,12 @@ export const redeemCode = (code: string) =>
     method: 'POST',
     body: JSON.stringify({ code }),
   })
+
+export const providerMarkNoShow = (bookingId: string) =>
+  api<{ code: string; bookingId: string }>(
+    `/api/providers/me/bookings/${bookingId}/mark-no-show`,
+    { method: 'POST' },
+  )
 
 export type RefundReason = 'provider_no_show' | 'quality_issue' | 'duplicate_charge' | 'other'
 export type RefundRequestStatus = 'open' | 'approved' | 'denied' | 'auto_resolved'

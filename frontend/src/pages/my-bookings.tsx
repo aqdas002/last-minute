@@ -45,7 +45,9 @@ export function MyBookingsPage() {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="font-medium">{b.listingTitle}</p>
+                <Link to={`/bookings/${b.id}`} className="font-medium hover:underline">
+                  {b.listingTitle}
+                </Link>
                 <p className="text-xs text-zinc-500">
                   {money(b.amountPaidCents, b.currency)} ·{' '}
                   {new Date(b.startTime).toLocaleString()}

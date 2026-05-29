@@ -123,6 +123,70 @@ class ProviderBookingsControllerIT extends IntegrationTestBase {
   }
 
   @Test
+  void mark_no_show_for_past_confirmed_booking_flips_to_no_show() throws Exception {
+    Booking b = seedConfirmedBookingStartingTodayPlusHours(-1, "NSHOW123");
+
+    mvc.perform(
+            post("/api/providers/me/bookings/{id}/mark-no-show", b.getId()).with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("OK"));
+
+    Booking after = bookings.findById(b.getId()).orElseThrow();
+    assertThat(after.getStatus()).isEqualTo(BookingStatus.no_show);
+  }
+
+  @Test
+  void mark_no_show_before_start_time_returns_409_NOT_YET_STARTED() throws Exception {
+    Booking b = seedConfirmedBookingStartingTodayPlusHours(2, "FUTURE12");
+
+    mvc.perform(
+            post("/api/providers/me/bookings/{id}/mark-no-show", b.getId()).with(asProvider()))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void mark_no_show_twice_returns_ALREADY_MARKED() throws Exception {
+    Booking b = seedConfirmedBookingStartingTodayPlusHours(-1, "TWICEMRK");
+
+    mvc.perform(
+            post("/api/providers/me/bookings/{id}/mark-no-show", b.getId()).with(asProvider()))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post("/api/providers/me/bookings/{id}/mark-no-show", b.getId()).with(asProvider()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value("ALREADY_MARKED"));
+  }
+
+  @Test
+  void mark_no_show_for_someone_elses_booking_returns_404() throws Exception {
+    Booking b = seedConfirmedBookingStartingTodayPlusHours(-1, "OTHER234");
+
+    // Build a different provider principal
+    User otherUser = new User();
+    otherUser.setEmail("other-" + UUID.randomUUID() + "@x");
+    otherUser.setRole(UserRole.provider);
+    otherUser = users.save(otherUser);
+    Provider op = new Provider();
+    op.setId(otherUser.getId());
+    op.setBusinessName("Other");
+    op.setCurrency("USD");
+    op.setTimezone("UTC");
+    op.setCity("New York");
+    op.setStatus(ProviderStatus.active);
+    op.setStripeChargesEnabled(true);
+    providers.save(op);
+    CurrentUser otherP = new CurrentUser(otherUser.getId(), otherUser.getEmail(), UserRole.provider);
+    org.springframework.security.core.Authentication otherAuth =
+        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+            otherP, null, List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PROVIDER")));
+
+    mvc.perform(
+            post("/api/providers/me/bookings/{id}/mark-no-show", b.getId())
+                .with(authentication(otherAuth)))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
   void summary_aggregates_payout_for_earning_bookings_only() throws Exception {
     // 2 earning (one confirmed, one completed) + 1 cancelled — only earning counts
     Booking earning1 = seedConfirmedBookingStartingTodayPlusHours(2, "SUMA1234");

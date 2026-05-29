@@ -95,6 +95,38 @@ public class ProviderBookingsController {
   public record RevenueSummary(
       long payoutCents, String currency, long bookingsCount, long cancelledCount, int windowDays) {}
 
+  /**
+   * Spec §3.4: provider marks a confirmed booking as no-show after start_time has passed.
+   * Does NOT auto-refund — booking moves confirmed → no_show. Consumer can still file a refund
+   * request (§6.4) if they believe this is wrong; admin reviews via /admin/refunds.
+   */
+  @PostMapping("/{id}/mark-no-show")
+  @Transactional
+  public ResponseEntity<MarkResult> markNoShow(
+      @AuthenticationPrincipal CurrentUser principal, @PathVariable("id") UUID bookingId) {
+    Booking b =
+        bookings
+            .findById(bookingId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "not_found"));
+    if (!b.getProvider().getId().equals(principal.id())) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "not_found");
+    }
+    if (b.getStatus() == BookingStatus.no_show) {
+      return ResponseEntity.ok(new MarkResult("ALREADY_MARKED", b.getId()));
+    }
+    if (b.getStatus() != BookingStatus.confirmed) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "NOT_CONFIRMED");
+    }
+    // Require start_time to be in the past to prevent premature no-show marks.
+    if (b.getListing().getStartTime().isAfter(Instant.now(clock))) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "NOT_YET_STARTED");
+    }
+    stateMachine.transition(b.getId(), BookingStatus.confirmed, BookingStatus.no_show, null);
+    return ResponseEntity.ok(new MarkResult("OK", b.getId()));
+  }
+
+  public record MarkResult(String code, UUID bookingId) {}
+
   @PostMapping("/redeem")
   @Transactional
   public ResponseEntity<RedemptionResult> redeem(

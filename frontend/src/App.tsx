@@ -14,6 +14,7 @@ import { ProviderBookingsTodayPage } from './pages/provider/bookings-today'
 import { ProviderBookingsAllPage } from './pages/provider/bookings-all'
 import { AdminRefundsPage } from './pages/admin/refunds'
 import { BookingSuccessPage } from './pages/booking-success'
+import { BookingDetailPage } from './pages/booking-detail'
 import { MyBookingsPage } from './pages/my-bookings'
 
 const qc = new QueryClient({
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/bookings" element={<MyBookingsPage />} />
             <Route path="/bookings/:id/success" element={<BookingSuccessPage />} />
+            <Route path="/bookings/:id" element={<BookingDetailPage />} />
             <Route path="/provider/signup" element={<ProviderSignUpPage />} />
             <Route path="/provider/onboarding" element={<ProviderOnboardingPage />} />
             <Route
