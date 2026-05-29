@@ -23,6 +23,9 @@ public class DbTruncate {
     em.createNativeQuery(
             """
             TRUNCATE TABLE
+              webhook_dead_letter,
+              payment_events,
+              admin_actions,
               verification_tokens,
               listings,
               providers,
