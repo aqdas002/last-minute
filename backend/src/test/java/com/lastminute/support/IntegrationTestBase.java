@@ -6,24 +6,30 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Base for integration tests. Spins up one Postgres container per test JVM (Surefire forks one
- * JVM by default; with {@code withReuse(true)} it persists across runs locally).
+ * Base for integration tests.
  *
- * <p>Tests extending this class also get {@link DbTruncate} injected via {@link #truncate}, called
- * in {@code @BeforeEach} to wipe business tables between tests in FK-safe order.
+ * <p>Starts ONE Postgres container per JVM (no JUnit @Container/@Testcontainers lifecycle so it
+ * isn't torn down between test classes — that re-binds the random port and breaks Spring's
+ * cached datasource bindings). The container is started in a static block and lives for the
+ * lifetime of the surefire fork; {@code @ServiceConnection} wires Spring's DataSource to it.
+ *
+ * <p>Tests extending this class get {@link DbTruncate} injected via {@link #truncate}, called in
+ * {@code @BeforeEach} to wipe business tables AND the listing caches between tests in FK-safe
+ * order.
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers
 public abstract class IntegrationTestBase {
 
-  @Container @ServiceConnection
+  @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>("postgres:16-alpine").withReuse(true);
+
+  static {
+    POSTGRES.start();
+  }
 
   @Autowired private DbTruncate truncate;
 

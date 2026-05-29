@@ -23,7 +23,9 @@ public class SecurityConfig {
         // For M1, disable CSRF for the magic-link request endpoint (no body except an email
         // address; anyone can ask for a magic link). When we add price-sensitive Server Actions
         // in M3, re-introduce CSRF for those routes specifically via a CookieCsrfTokenRepository.
-        .csrf(c -> c.ignoringRequestMatchers("/api/auth/**", "/api/webhooks/**"))
+        // M1: admin endpoints are role-gated; M3 will introduce CSRF for consumer state-changing
+        // endpoints. /api/auth and /api/webhooks are by design CSRF-free.
+        .csrf(c -> c.ignoringRequestMatchers("/api/auth/**", "/api/webhooks/**", "/api/admin/**"))
         .cors(Customizer.withDefaults())
         .authorizeHttpRequests(
             a ->

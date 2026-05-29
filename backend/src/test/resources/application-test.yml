@@ -4,6 +4,15 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  datasource:
+    hikari:
+      # Small pool per Spring context. With several context-varying @TestConfiguration
+      # in the suite, multiple HikariCP instances live concurrently; this keeps each
+      # one small so we don't hit Postgres' max_connections cap.
+      maximum-pool-size: 5
+      minimum-idle: 0
+      idle-timeout: 30000
+      connection-timeout: 30000
 
 sentry:
   enabled: false

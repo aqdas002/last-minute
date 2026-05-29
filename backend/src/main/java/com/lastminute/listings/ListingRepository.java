@@ -12,12 +12,14 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
 
   /**
    * Consumer-facing "starting soon" feed. Strict {@code listing_expires_at > now} (belt-and-braces
-   * per spec §2 caching). Optional city filter. Status is passed as a parameter so the JPQL
-   * enum literal doesn't generate a Java-class-name cast Postgres can't resolve.
+   * per spec §2 caching). Optional city filter. {@code JOIN FETCH} eagerly loads category +
+   * provider so the DTO serializer doesn't trip {@code LazyInitializationException}.
    */
   @Query(
       """
       SELECT l FROM Listing l
+        JOIN FETCH l.category
+        JOIN FETCH l.provider
       WHERE l.status = :status
         AND l.listingExpiresAt > :now
         AND (:city IS NULL OR l.city = :city)
@@ -30,7 +32,9 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
 
   @Query(
       """
-      SELECT l FROM Listing l JOIN l.category c
+      SELECT l FROM Listing l
+        JOIN FETCH l.category c
+        JOIN FETCH l.provider
       WHERE c.slug = :slug
         AND l.status = :status
         AND l.listingExpiresAt > :now
@@ -44,6 +48,8 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
   @Query(
       """
       SELECT l FROM Listing l
+        JOIN FETCH l.category
+        JOIN FETCH l.provider
       WHERE l.id = :id
         AND l.status = :status
         AND l.listingExpiresAt > :now

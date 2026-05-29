@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,10 +24,12 @@ public class ListingQueryService {
     this.clock = clock;
   }
 
+  @Cacheable(cacheNames = "starting-soon", key = "#city == null ? 'ALL' : #city")
   public List<Listing> startingSoon(String city) {
     return repo.findStartingSoon(Instant.now(clock), city, ListingStatus.active);
   }
 
+  @Cacheable(cacheNames = "listings-by-category", key = "#slug")
   public List<Listing> byCategorySlug(String slug) {
     return repo.findActiveByCategorySlug(Instant.now(clock), slug, ListingStatus.active);
   }
