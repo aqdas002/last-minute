@@ -20,6 +20,9 @@ sentry:
 app:
   resend:
     api-key: ""
+  stripe:
+    secret-key: "sk_test_fake_for_tests"
+    webhook-secret: "whsec_test_secret_for_tests"
   base-url: "http://localhost:8080"
   frontend-origin: "http://localhost:5173"
   commission-percent: 15

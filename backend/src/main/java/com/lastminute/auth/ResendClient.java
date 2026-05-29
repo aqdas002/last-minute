@@ -54,4 +54,26 @@ public class ResendClient {
         .retrieve()
         .toBodilessEntity();
   }
+
+  /** Spec §5 Flow 2 step 6: notify the provider once Stripe Connect KYC clears. */
+  public void sendProviderLive(String to) {
+    if (apiKey == null || apiKey.isBlank()) {
+      LOG.warn("[dev] would email {} -> 'You're live on Last Minute'", to);
+      return;
+    }
+    http
+        .post()
+        .uri("/emails")
+        .header("Authorization", "Bearer " + apiKey)
+        .body(
+            Map.of(
+                "from", from,
+                "to", to,
+                "subject", "You're live on Last Minute",
+                "html",
+                    "<p>Your Stripe verification is complete.</p>"
+                        + "<p>You can now publish listings and start taking bookings.</p>"))
+        .retrieve()
+        .toBodilessEntity();
+  }
 }
