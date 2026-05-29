@@ -10,6 +10,8 @@ import { ProviderOnboardingPage } from './pages/provider/onboarding'
 import { ProviderOnboardingReturnPage } from './pages/provider/onboarding-return'
 import { ProviderDashboardPage } from './pages/provider/dashboard'
 import { ProviderListingsPage } from './pages/provider/listings'
+import { BookingSuccessPage } from './pages/booking-success'
+import { MyBookingsPage } from './pages/my-bookings'
 
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: false } },
@@ -26,6 +28,8 @@ export default function App() {
             <Route path="/c/:slug" element={<CategoryPage />} />
             <Route path="/l/:id" element={<ListingPage />} />
             <Route path="/signin" element={<SignInPage />} />
+            <Route path="/bookings" element={<MyBookingsPage />} />
+            <Route path="/bookings/:id/success" element={<BookingSuccessPage />} />
             <Route path="/provider/signup" element={<ProviderSignUpPage />} />
             <Route path="/provider/onboarding" element={<ProviderOnboardingPage />} />
             <Route

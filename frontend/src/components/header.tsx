@@ -8,6 +8,9 @@ export function Header() {
           Last Minute
         </Link>
         <nav className="flex items-center gap-3 text-sm">
+          <Link to="/bookings" className="text-zinc-700 hover:underline">
+            My bookings
+          </Link>
           <Link to="/provider/signup" className="text-zinc-700 hover:underline">
             For providers
           </Link>
