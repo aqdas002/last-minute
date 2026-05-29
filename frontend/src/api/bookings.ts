@@ -25,3 +25,37 @@ export const myBookings = () => api<Booking[]>('/api/bookings/me')
 
 export const refreshBookingStatus = (id: string) =>
   api<Booking>(`/api/bookings/${id}/refresh-status`, { method: 'POST' })
+
+export type ProviderBooking = {
+  id: string
+  listingId: string
+  listingTitle: string
+  consumerEmail: string
+  status: BookingStatus
+  startTime: string
+  confirmedAt: string | null
+  redeemedAt: string | null
+  redemptionCode: string | null
+  amountPaidCents: number
+  providerPayoutCents: number
+  currency: string
+}
+
+export const providerTodayBookings = () =>
+  api<ProviderBooking[]>('/api/providers/me/bookings/today')
+
+export const providerAllBookings = () =>
+  api<ProviderBooking[]>('/api/providers/me/bookings/all')
+
+export type RedemptionResult = {
+  code: 'OK' | 'ALREADY_REDEEMED' | 'CODE_NOT_VALID'
+  bookingId: string | null
+  redeemedAt: string | null
+  listingTitle: string | null
+}
+
+export const redeemCode = (code: string) =>
+  api<RedemptionResult>('/api/providers/me/bookings/redeem', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  })

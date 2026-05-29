@@ -32,6 +32,12 @@ export function ProviderDashboardPage() {
         >
           Manage listings
         </Link>
+        <Link
+          to="/provider/bookings/today"
+          className="rounded border border-zinc-900 px-4 py-2 text-sm text-zinc-900"
+        >
+          Today's bookings
+        </Link>
         {!isLive && (
           <Link
             to="/provider/onboarding"

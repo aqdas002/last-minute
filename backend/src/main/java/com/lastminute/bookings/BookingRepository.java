@@ -38,6 +38,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
   Optional<Booking> findByStripeCheckoutSessionId(String sessionId);
 
+  Optional<Booking> findByStripePaymentIntentId(String paymentIntentId);
+
   @Query(
       """
       SELECT b FROM Booking b
@@ -91,4 +93,32 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
   int attachCheckoutSession(@Param("id") UUID id, @Param("sessionId") String sessionId);
 
   List<Booking> findAllByConsumer_IdOrderByCreatedAtDesc(UUID consumerId);
+
+  /** Provider /today: confirmed bookings whose listing start_time falls in [from, to). */
+  @Query(
+      """
+      SELECT b FROM Booking b
+        JOIN FETCH b.listing l
+        JOIN FETCH b.consumer
+      WHERE b.provider.id = :providerId
+        AND b.status = :status
+        AND l.startTime >= :from AND l.startTime < :to
+      ORDER BY l.startTime ASC
+      """)
+  List<Booking> findTodaysConfirmed(
+      @Param("providerId") UUID providerId,
+      @Param("status") BookingStatus status,
+      @Param("from") Instant from,
+      @Param("to") Instant to);
+
+  /** Provider /all: most recent bookings, any status. */
+  @Query(
+      """
+      SELECT b FROM Booking b
+        JOIN FETCH b.listing l
+        JOIN FETCH b.consumer
+      WHERE b.provider.id = :providerId
+      ORDER BY b.createdAt DESC
+      """)
+  List<Booking> findRecentByProvider(@Param("providerId") UUID providerId);
 }
