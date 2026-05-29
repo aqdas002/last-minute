@@ -2,11 +2,14 @@ package com.lastminute.bookings;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lastminute.auth.ResendClient;
 import com.lastminute.webhooks.PaymentEvent;
 import com.lastminute.webhooks.PaymentEventRepository;
 import com.lastminute.webhooks.StripeEventReceived;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -30,9 +33,13 @@ public class BookingConfirmedHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(BookingConfirmedHandler.class);
 
+  private static final DateTimeFormatter TS_FMT =
+      DateTimeFormatter.ofPattern("h:mm a 'on' EEE, MMM d");
+
   private final PaymentEventRepository events;
   private final BookingRepository bookings;
   private final BookingStateMachine stateMachine;
+  private final ResendClient email;
   private final Clock clock;
   private final ObjectMapper json;
 
@@ -40,11 +47,13 @@ public class BookingConfirmedHandler {
       PaymentEventRepository events,
       BookingRepository bookings,
       BookingStateMachine stateMachine,
+      ResendClient email,
       Clock clock,
       ObjectMapper json) {
     this.events = events;
     this.bookings = bookings;
     this.stateMachine = stateMachine;
+    this.email = email;
     this.clock = clock;
     this.json = json;
   }
@@ -99,6 +108,24 @@ public class BookingConfirmedHandler {
         LOG.debug("booking {} already confirmed (replay)", bookingId);
       } else {
         LOG.info("booking {} confirmed", bookingId);
+        // Only send the email on the first transition, not on webhook replays.
+        try {
+          var listing = b.getListing();
+          String when =
+              TS_FMT.format(
+                  listing.getStartTime().atZone(ZoneId.of(listing.getTimezone())));
+          email.sendBookingConfirmed(
+              b.getConsumer().getEmail(),
+              listing.getTitle(),
+              when,
+              b.getRedemptionCode(),
+              b.getProvider().getBusinessName(),
+              listing.getAddress());
+        } catch (Exception emailErr) {
+          // Don't fail the webhook on email failure — the booking IS confirmed; user can see it
+          // in /bookings. Log for ops follow-up.
+          LOG.error("confirmation email failed for booking {}", bookingId, emailErr);
+        }
       }
       markProcessed(row);
 

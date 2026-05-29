@@ -55,6 +55,56 @@ public class ResendClient {
         .toBodilessEntity();
   }
 
+  /** Spec §5 Flow 1 step 8b: confirmation email sent right after pending→confirmed. */
+  public void sendBookingConfirmed(
+      String to,
+      String listingTitle,
+      String startTimeFormatted,
+      String redemptionCode,
+      String providerName,
+      String address) {
+    if (apiKey == null || apiKey.isBlank()) {
+      LOG.warn(
+          "[dev] would email {} -> confirmed '{}' at {} (code {}, provider {}, addr {})",
+          to,
+          listingTitle,
+          startTimeFormatted,
+          redemptionCode,
+          providerName,
+          address);
+      return;
+    }
+    http
+        .post()
+        .uri("/emails")
+        .header("Authorization", "Bearer " + apiKey)
+        .body(
+            Map.of(
+                "from", from,
+                "to", to,
+                "subject", "Booking confirmed: " + listingTitle,
+                "html",
+                    "<p>You're booked for <strong>"
+                        + listingTitle
+                        + "</strong> with "
+                        + providerName
+                        + ".</p>"
+                        + "<p>When: "
+                        + startTimeFormatted
+                        + "<br>"
+                        + "Where: "
+                        + (address == null ? "see provider for details" : address)
+                        + "</p>"
+                        + "<p>Show this code at the door:<br>"
+                        + "<strong style=\"font-size:24px;letter-spacing:4px\">"
+                        + redemptionCode
+                        + "</strong></p>"
+                        + "<p style=\"color:#666\">All sales final. Full refund if the provider"
+                        + " doesn't honor your booking.</p>"))
+        .retrieve()
+        .toBodilessEntity();
+  }
+
   /** Spec §5 Flow 1 step 9: T-1h booking reminder. */
   public void sendBookingReminder(
       String to, String listingTitle, String startTimeFormatted, String redemptionCode) {
