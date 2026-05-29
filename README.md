@@ -31,12 +31,18 @@ This is a working MVP being built in vertical milestones. **Single-city pilot fi
 
 | Milestone | Scope | State |
 |---|---|---|
-| M1 | Auth (magic-link + Google OAuth), category browse, listing detail, admin-seeded inventory | ✅ shipped |
-| M2 | Provider self-onboarding via Stripe Connect Express + listing CRUD + commission disclosure UI | 🚧 in progress |
-| M3 | Consumer booking + payment via Stripe Checkout (the riskiest slice — concurrency, webhooks, idempotency) | upcoming |
-| M4 | Provider redemption (code-based) + post-redemption refund/chargeback handling | upcoming |
-| M5 | Lifecycle jobs: listing expiry, no-show auto-refund pipeline, transactional email | upcoming |
-| M6 | Pre-launch hardening: E2E tests, Playwright smoke, Sentry, release checklist | upcoming |
+| M1 | Auth (magic-link), category browse, listing detail, admin-seeded inventory | ✅ shipped |
+| M2 | Provider self-onboarding via Stripe Connect Express + listing CRUD + commission disclosure UI | ✅ shipped |
+| M3 | Consumer booking + payment via Stripe Checkout (the riskiest slice — concurrency, webhooks, idempotency) | ✅ shipped |
+| M4 | Provider redemption (8-char code) + refund/chargeback webhook handlers | ✅ shipped |
+| M5 | Keyword search across listings + T-1h booking reminder email job | ✅ shipped |
+| M6 | Provider 30-day revenue summary on dashboard | ✅ shipped |
+| M7 | Provider all-bookings history page with status filters | ✅ shipped |
+| M8 | Booking confirmation email on first webhook (replay-safe) | ✅ shipped |
+| M9 | Consumer self-service refund request ("provider didn't honor my booking") + auto-close on charge.refunded webhook | ✅ shipped |
+| M10 | Admin refund-request queue + deny/notes endpoints | ✅ shipped |
+| M11 | Provider listing edit UI (with active-bookings safeguard) + admin refund queue UI | ✅ shipped |
+| M12 | Pre-launch hardening: real Stripe smoke test, Sentry wiring, release checklist | upcoming |
 
 ## Architecture
 
@@ -90,8 +96,9 @@ pnpm dev
 ### Run the tests
 
 ```bash
-cd backend && ./mvnw test          # 79 tests, ~60s incl. Testcontainers Postgres
+cd backend && ./mvnw test          # 157 tests, ~3min incl. Testcontainers Postgres
 cd frontend && pnpm build          # type-check + production build
+cd frontend && pnpm lint           # ESLint (React 19 rules)
 ```
 
 ## Project layout
@@ -115,9 +122,11 @@ A few choices that recur in the codebase — context for new contributors:
 
 - **All timestamps `TIMESTAMPTZ` and UTC.** Times are passed from JS via an injectable `Clock` bean (`backend/src/main/java/com/lastminute/common/ClockConfig.java`); raw `Instant.now()` outside the clock service fails an ArchUnit test (see `backend/src/test/java/com/lastminute/archunit/ClockUsageTest.java`).
 - **Money is integer cents only.** Commission math is `Math.floorDiv((amount * 15) / 100)` in a single `PricingService`; tests cover the §3.2 boundary set including `99999999999 → 14999999999`.
-- **Concurrency:** booking transactions will use `SELECT … FOR UPDATE` on the listing row (lands in M3) so two simultaneous bookings on the last spot serialize safely; partial unique indices encode "one active booking per consumer per listing."
-- **Webhook idempotency:** every Stripe event is persisted to `payment_events` with `UNIQUE (stripe_event_id)`; duplicate deliveries are no-ops. A `webhook_dead_letter` table + a `@Scheduled` drain job handles transient delivery failures (the Spring-native replacement for Inngest).
-- **Cache:** Caffeine 15-second TTL on listings reads with `@CacheEvict allEntries` on admin writes. The correctness layer is the SQL `listing_expires_at > now()` filter, not the cache.
+- **Concurrency:** booking transactions use `SELECT … FOR UPDATE` on the listing row so two simultaneous bookings on the last spot serialize safely; partial unique indices encode "one active booking per consumer per listing" and "redemption-code uniqueness per provider while active." A test fires N=10 concurrent reservers at a capacity-1 listing and asserts exactly one winner.
+- **Webhook idempotency:** every Stripe event is persisted to `payment_events` with `UNIQUE (stripe_event_id)`; duplicate deliveries are no-ops. A fast-path `findByStripeEventId` + `saveAndFlush` defeats JPA defer-flush hiding `DataIntegrityViolationException` from the controller. A `webhook_dead_letter` table + a `@Scheduled` drain job handles transient delivery failures.
+- **Eventing:** Spring `@TransactionalEventListener(AFTER_COMMIT)` + `@Transactional(REQUIRES_NEW)` for `BookingConfirmedHandler`, `RefundHandler`, `ChargebackHandler`, and `RefundRequestAutoCloser` — the Spring-native replacement for Inngest. Email send on first-confirm only (replay-safe via the state machine's `alreadyApplied` branch).
+- **Cache:** Caffeine 15-second TTL on listings reads with `@CacheEvict allEntries` on provider publish/edit + admin writes. The correctness layer is the SQL `listing_expires_at > now()` filter, not the cache.
+- **JPQL enum literals:** every `@Query` that compares against an enum binds the value via `@Param` instead of writing `b.status = com.lastminute.bookings.BookingStatus.confirmed` — Hibernate emits `'confirmed'::BookingStatus` (the Java FQN) for the literal form, which Postgres doesn't recognize. The retros call this trap out; it bit M2, M4, and M5.
 
 Full design discussion: [`docs/superpowers/specs/2026-05-26-last-minute-booking-design.md`](docs/superpowers/specs/2026-05-26-last-minute-booking-design.md).
 
