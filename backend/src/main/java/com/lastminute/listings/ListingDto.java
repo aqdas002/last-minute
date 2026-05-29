@@ -21,7 +21,8 @@ public record ListingDto(
     List<String> images,
     String categorySlug,
     String categoryName,
-    String providerName) {
+    String providerName,
+    ListingStatus status) {
 
   public static ListingDto from(Listing l) {
     return new ListingDto(
@@ -41,6 +42,7 @@ public record ListingDto(
         l.getImages(),
         l.getCategory().getSlug(),
         l.getCategory().getName(),
-        l.getProvider().getBusinessName());
+        l.getProvider().getBusinessName(),
+        l.getStatus());
   }
 }

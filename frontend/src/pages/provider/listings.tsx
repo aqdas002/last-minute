@@ -43,28 +43,52 @@ export function ProviderListingsPage() {
             {listings.map(l => (
               <li
                 key={l.id}
-                className="flex items-center justify-between rounded border border-zinc-200 p-3"
+                className="flex items-center justify-between gap-3 rounded border border-zinc-200 p-3"
               >
-                <div>
-                  <p className="font-medium">{l.title}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium">{l.title}</p>
+                    <StatusPill status={l.status} />
+                  </div>
                   <p className="text-xs text-zinc-500">
                     {l.categoryName} · {money(l.discountedPriceCents, l.currency)} (was{' '}
                     {money(l.originalPriceCents, l.currency)})
                   </p>
                 </div>
-                <button
-                  disabled={publishMut.isPending}
-                  onClick={() => publishMut.mutate(l.id)}
-                  className="rounded border border-zinc-300 px-3 py-1 text-sm disabled:opacity-50"
-                >
-                  Publish
-                </button>
+                {l.status === 'draft' ? (
+                  <button
+                    disabled={publishMut.isPending}
+                    onClick={() => publishMut.mutate(l.id)}
+                    className="rounded bg-zinc-900 px-3 py-1 text-sm text-white disabled:opacity-50"
+                  >
+                    {publishMut.isPending ? 'Publishing…' : 'Publish'}
+                  </button>
+                ) : (
+                  <span className="text-xs text-zinc-400">—</span>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
     </div>
+  )
+}
+
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    draft: 'bg-zinc-100 text-zinc-700 border-zinc-200',
+    active: 'bg-green-50 text-green-800 border-green-200',
+    suspended: 'bg-red-50 text-red-800 border-red-200',
+    cancelled: 'bg-zinc-100 text-zinc-500 border-zinc-200',
+    expired: 'bg-zinc-50 text-zinc-500 border-zinc-200',
+    sold_out: 'bg-amber-50 text-amber-800 border-amber-200',
+  }
+  const cls = styles[status] ?? 'bg-zinc-100 text-zinc-700 border-zinc-200'
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${cls}`}>
+      {status}
+    </span>
   )
 }
 

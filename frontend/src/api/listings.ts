@@ -18,6 +18,7 @@ export type Listing = {
   categorySlug: string
   categoryName: string
   providerName: string
+  status: 'draft' | 'active' | 'suspended' | 'cancelled' | 'expired' | 'sold_out'
 }
 
 export type Category = { id: string; slug: string; name: string; iconName: string | null }
